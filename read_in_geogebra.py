@@ -81,9 +81,6 @@ def parse_ggb_file(ggb_filename):
     Parses a GeoGebra (.ggb) file to extract geometric data.
     Returns dictionaries for points, lines, segments, and circles.
     """
-    import os
-    import zipfile
-    import xml.etree.ElementTree as ET
 
     def circle_from_center_and_point(center, point):
         """Helper to calculate circle data from center and point."""

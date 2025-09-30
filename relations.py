@@ -24,26 +24,33 @@ PERPENDICULAR_ANGLE = (frozenset({ZERO_ZERO, UNIT_X}), frozenset({ZERO_ZERO, UNI
 
 # Base class for relations
 class RelationNode:
-    def __init__(self, name: str, relation, parents: Optional[List["RelationNode"]] = None, rule : Optional[str] = None, 
+    def __init__(self, name: str, index: int, relation, parents: Optional[List["RelationNode"]] = None, rule: Optional[str] = None,
                  representation: str = "", equivalent: Optional[List["RelationNode"]] = None):
         self.name = name
+        self.index = index
         self.relation = relation
         self.parents = parents if parents is not None else []
         self.rule = rule if rule is not None else ""
         self.representation = representation
         self.equivalent = equivalent if equivalent is not None else []
 
+    def add_index(self, index: int):
+        self.index = index
+        return self
+    
     # TODO: improve representation
     def __repr__(self):
-        return f"{self.representation}"
+        return f"[{self.index}] {self.representation}"
 
 
 class Congruent(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="cong",
+            index=index,
             relation=frozenset({frozenset({p1, p2}), frozenset({p3, p4})}),
             representation=f"cong {p1} {p2} {p3} {p4}",
             parents=parents,
@@ -54,10 +61,12 @@ class Congruent(RelationNode):
 class EqualAngle(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "eqangle",
+            name="eqangle",
+            index=index,
             relation=frozenset({
                 (frozenset({p1, p2}), frozenset({p2, p3})),
                 (frozenset({p4, p5}), frozenset({p5, p6}))
@@ -71,10 +80,12 @@ class EqualAngle(RelationNode):
 class Sameclock(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "sameclock",
+            name="sameclock",
+            index=index,
             relation=frozenset({(p1, p2, p3), (p4, p5, p6)}),
             representation=f"sameclock {p1} {p2} {p3} {p4} {p5} {p6}",
             parents=parents,
@@ -84,11 +95,13 @@ class Sameclock(RelationNode):
 
 class Parallel(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "para",
-            relation=frozenset({(p1, p2), (p3, p4)}),
+            name="para",
+            index=index,
+            relation=frozenset({frozenset({p1, p2}), frozenset({p3, p4})}),
             representation=f"para {p1} {p2} {p3} {p4}",
             parents=parents,
             rule=rule
@@ -97,11 +110,13 @@ class Parallel(RelationNode):
 
 class Perpendicular(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "perp",
-            relation=frozenset({(p1, p2), (p3, p4)}),
+            name="perp",
+            index=index,
+            relation=frozenset({frozenset({p1, p2}), frozenset({p3, p4})}),
             representation=f"perp {p1} {p2} {p3} {p4}",
             parents=parents,
             rule=rule
@@ -110,38 +125,47 @@ class Perpendicular(RelationNode):
 
 class Collinear(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "col",
+            name="col",
+            index=index,
             relation=frozenset({p1, p2, p3}),
             representation=f"col {p1} {p2} {p3}",
             parents=parents,
-            rule=rule
+            rule=rule,
+            equivalent=[
+                Parallel(p1, p2, p1, p3, parents=[self]),
+                Parallel(p1, p2, p2, p3, parents=[self])
+            ]
         )
 
 
 class Cyclic(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "cyclic",
+            name="cyclic",
+            index=index,
             relation=frozenset({p1, p2, p3, p4}),
             representation=f"cyclic {p1} {p2} {p3} {p4}",
             parents=parents,
             rule=rule
-            # equivalent=[EqualAngle(p1, p2, p3, p1, p4, p3, [self])]
         )
 
 
 class SimilarTriangle1(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "simtri1",
+            name="simtri1",
+            index=index,
             relation=frozenset({
                 frozenset({p1, p4}),
                 frozenset({p2, p5}),
@@ -151,10 +175,10 @@ class SimilarTriangle1(RelationNode):
             parents=parents,
             rule=rule,
             equivalent=[
-                EqualAngle(p1, p2, p3, p4, p5, p6, [self]),
-                EqualAngle(p2, p3, p1, p5, p6, p4, [self]),
-                # EqualAngle(p3, p1, p2, p6, p4, p5, [self]),
-                Sameclock(p1, p2, p3, p4, p5, p6, [self])
+                EqualAngle(p1, p2, p3, p4, p5, p6, parents=[self]),
+                EqualAngle(p2, p3, p1, p5, p6, p4, parents=[self]),
+                EqualAngle(p3, p1, p2, p6, p4, p5, parents=[self]),
+                Sameclock(p1, p2, p3, p4, p5, p6, parents=[self])
             ]
         )
 
@@ -162,10 +186,12 @@ class SimilarTriangle1(RelationNode):
 class SimilarTriangle2(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "simtri2",
+            name="simtri2",
+            index=index,
             relation=frozenset({
                 frozenset({p1, p4}),
                 frozenset({p2, p5}),
@@ -175,10 +201,10 @@ class SimilarTriangle2(RelationNode):
             parents=parents,
             rule=rule,
             equivalent=[
-                EqualAngle(p1, p2, p3, p6, p5, p4, [self]),
-                EqualAngle(p2, p3, p1, p4, p6, p5, [self]),
-                # EqualAngle(p3, p1, p2, p5, p4, p6, [self]),
-                Sameclock(p1, p2, p3, p6, p5, p4, [self])
+                EqualAngle(p1, p2, p3, p6, p5, p4, parents=[self]),
+                EqualAngle(p2, p3, p1, p4, p6, p5, parents=[self]),
+                EqualAngle(p3, p1, p2, p5, p4, p6, parents=[self]),
+                Sameclock(p1, p2, p3, p6, p5, p4, parents=[self])
             ]
         )
 
@@ -186,10 +212,12 @@ class SimilarTriangle2(RelationNode):
 class CongruentTriangle1(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "contri1",
+            name="contri1",
+            index=index,
             relation=frozenset({
                 frozenset({p1, p4}),
                 frozenset({p2, p5}),
@@ -199,13 +227,13 @@ class CongruentTriangle1(RelationNode):
             parents=parents,
             rule=rule,
             equivalent=[
-                Congruent(p1, p2, p4, p5, [self]),
-                Congruent(p2, p3, p5, p6, [self]),
-                Congruent(p3, p1, p6, p4, [self]),
-                EqualAngle(p1, p2, p3, p4, p5, p6, [self]),
-                EqualAngle(p2, p3, p1, p5, p6, p4, [self]),
-                # EqualAngle(p3, p1, p2, p6, p4, p5, [self]),
-                Sameclock(p1, p2, p3, p4, p5, p6, [self])
+                Congruent(p1, p2, p4, p5, parents=[self]),
+                Congruent(p2, p3, p5, p6, parents=[self]),
+                Congruent(p3, p1, p6, p4, parents=[self]),
+                EqualAngle(p1, p2, p3, p4, p5, p6, parents=[self]),
+                EqualAngle(p2, p3, p1, p5, p6, p4, parents=[self]),
+                EqualAngle(p3, p1, p2, p6, p4, p5, parents=[self]),
+                Sameclock(p1, p2, p3, p4, p5, p6, parents=[self])
             ]
         )
 
@@ -213,10 +241,12 @@ class CongruentTriangle1(RelationNode):
 class CongruentTriangle2(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "contri2",
+            name="contri2",
+            index=index,
             relation=frozenset({
                 frozenset({p1, p4}),
                 frozenset({p2, p5}),
@@ -226,31 +256,49 @@ class CongruentTriangle2(RelationNode):
             parents=parents,
             rule=rule,
             equivalent=[
-                Congruent(p1, p2, p4, p5, [self]),
-                Congruent(p2, p3, p5, p6, [self]),
-                Congruent(p3, p1, p6, p5, [self]),
-                EqualAngle(p1, p2, p3, p6, p5, p4, [self]),
-                EqualAngle(p2, p3, p1, p4, p6, p5, [self]),
-                # EqualAngle(p3, p1, p2, p6, p4, p5, [self]),
-                Sameclock(p1, p2, p3, p6, p5, p4, [self])
+                Congruent(p1, p2, p4, p5, parents=[self]),
+                Congruent(p2, p3, p5, p6, parents=[self]),
+                Congruent(p3, p1, p6, p5, parents=[self]),
+                EqualAngle(p1, p2, p3, p6, p5, p4, parents=[self]),
+                EqualAngle(p2, p3, p1, p4, p6, p5, parents=[self]),
+                EqualAngle(p3, p1, p2, p6, p4, p5, parents=[self]),
+                Sameclock(p1, p2, p3, p6, p5, p4, parents=[self])
             ]
         )
 
 
 class Midpoint(RelationNode):
     def __init__(self, mid: Point, p1: Point, p2: Point,
+                 index: Optional[int] = None,
                  parents: Optional[List[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
-            "midp",
-            relation=frozenset({mid, p1, p2}),
+            name="midp",
+            index=index,
+            relation=(mid, frozenset({p1, p2})),
             representation=f"midp {mid} {p1} {p2}",
             parents=parents,
             rule=rule,
             equivalent=[
-                Congruent(mid, p1, mid, p2, [self]),
-                Collinear(mid, p1, p2, [self])
+                Congruent(mid, p1, mid, p2, parents=[self]),
+                Collinear(mid, p1, p2, parents=[self])
             ]
+        )
+
+class EqualRatio(RelationNode):
+    def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 p5: Point, p6: Point, p7: Point, p8: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[List[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="eqratio",
+            index=index,
+            relation=(frozenset({p1, p2}), frozenset({p3, p4}),
+                      frozenset({p5, p6}), frozenset({p7, p8})),
+            representation=f"eqratio {p1} {p2} {p3} {p4} {p5} {p6} {p7} {p8}",
+            parents=parents,
+            rule=rule
         )
 
 

@@ -2,7 +2,7 @@
 from relations import *
 
 RELATION_TYPES = ["cong", "eqangle", "sameclock", "para", "perp", "col", "cyclic",
-                  "simtri1", "simtri2", "contri1", "contri2", "midp"]
+                  "simtri1", "simtri2", "contri1", "contri2", "midp", "eqratio"]
 
 class Problem:
     def __init__(self, name: str, points: List[Point],

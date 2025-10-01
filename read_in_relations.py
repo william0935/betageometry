@@ -4,17 +4,17 @@
 from relations import *
 
 def parse_text(statement_path):
-    f = open(statement_path, 'r')
+    f = open(f"Text Files/{statement_path}", 'r')
     statement_str = f.read()
     f.close()
-    pieces = statement_str.split(';')
+    pieces = statement_str.split('; ')
     assumptions_strs = []
     goals_strs = []
     for str in pieces:
         str.strip()
-        str.replace(';', '')
+        str.replace('; ', '')
         if str[0] == '?':
-            goals_strs.append(str[1:])
+            goals_strs.append(str[2:])
         else:
             assumptions_strs.append(str)
     return assumptions_strs, goals_strs
@@ -55,6 +55,8 @@ def get_relation(rel_str, all_points):
         relation = CongruentTriangle1(points[0], points[1], points[2], points[3], points[4], points[5])
     elif word == 'contri2':
         relation = CongruentTriangle2(points[0], points[1], points[2], points[3], points[4], points[5])
+    elif word == 'eqratio':
+        relation = EqualRatio(points[0], points[1], points[2], points[3], points[4], points[5], points[6], points[7])
     else:
         raise ValueError(f"Relation type {word} not recognized.")
     

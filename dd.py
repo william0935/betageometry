@@ -1,6 +1,6 @@
 import itertools
 from relations import *
-from Problem import Problem
+from problem import Problem
 from typing import List, Tuple, Optional
 
 
@@ -12,11 +12,9 @@ class DeductiveDatabase:
         # ADD THE NEW RULES HERE
         self.rules = [
             self.apply_congABCD_congCDEF_congABEF,
-            self.apply_parallel_transitivity,
-            self.apply_collinearity_extension,
             self.apply_parallel_to_angles,
-            self.apply_collinear_to_angles,
-            self.apply_triangle_congruence_sas,
+            self.apply_colABC_eqangleABDBCD,
+            self.apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE,
         ]
 
     def apply_deduction_rules(self, max_iterations: int) -> bool:   

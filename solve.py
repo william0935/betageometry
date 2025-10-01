@@ -12,14 +12,14 @@ problem_name = "test"
 # parse info from .ggb through Read_in_Geogebra_File.py
 points_dict, lines, circles = parse_picture(f"{problem_name}.ggb")
 
-# draw initial setup
+# draw initial setup with calls to Constructions.py
 fig, ax = plt.subplots()
 plot_point(ax, points_dict)
 plot_lines_from_eq(ax, lines)
 plot_circles_from_eq(ax, circles)
 plt.show()
 
-# create starting points
+# create starting points for the problem(separate from the plotting)
 points = []
 for point in points_dict:
     point_obj = Point(point, points_dict[point][0], points_dict[point][1])

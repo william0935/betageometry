@@ -12,11 +12,22 @@ class DeductiveDatabase:
         # ADD THE NEW RULES HERE
         self.rules = [
             self.apply_congABCD_congCDEF_congABEF,
-            self.apply_parallel_to_angles,
+            self.apply_paraABCD_eqangleABCDCB,
             self.apply_colABC_eqangleABDBCD,
             self.apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE,
         ]
 
+    def is_relation_new(self, relation: RelationNode) -> bool:
+        """Check if a relation is new without adding it to the problem."""
+        if not relation.name in self.problem.relations:
+            return True
+            
+        existing_relations = self.problem.relations[relation.name]
+        for existing in existing_relations:
+            if existing.relation == relation.relation:
+                return False
+        return True
+    
     def apply_deduction_rules(self, max_iterations: int) -> bool:   
         for iteration in range(max_iterations):
             progress_made = False
@@ -26,13 +37,16 @@ class DeductiveDatabase:
             for rule in self.rules:
                 new_relations.extend(rule())
             
-            # Add any new relations found
+            # Add any new relations found and track if they're actually new
             for new_rel in new_relations:
-                self.problem.add_relation(new_rel) # The check for duplicates happens inside add_relation
-                progress_made = True
+                if self.is_relation_new(new_rel):
+                    print("Derived new relation: ", new_rel)
+                    self.problem.add_relation(new_rel)
+                    progress_made = True
             
             # Check if we made progress
             if not progress_made:
+                print(f"No new relations in iteration {iteration}. Stopping.")
                 break  # No new relations derived, stop
                 
             if self.problem.is_solved():
@@ -53,7 +67,7 @@ class DeductiveDatabase:
         return new_relations
 
     # Rule: parallel lines -> equal angles
-    def apply_parallel_to_angles(self) -> List[RelationNode]:
+    def apply_paraABCD_eqangleABCDCB(self) -> List[RelationNode]:
         new_relations = []
         parallels = self.problem.relations.get("para", [])
         
@@ -69,9 +83,8 @@ class DeductiveDatabase:
         collinears = self.problem.relations.get("col", [])
         
         for col_rel in collinears:
-            angle_rel = self.colABC_eqangleABDBCD(col_rel)
-            if angle_rel:
-                new_relations.append(angle_rel)
+            angle_rels = self.colABC_eqangleABDBCD(col_rel)
+            new_relations.extend(angle_rels)
         return new_relations
     
     # Rule: Triangle congruence SAS
@@ -191,28 +204,42 @@ class DeductiveDatabase:
                          parents=[cong1, cong2], rule="congABCD_congCDEF_congABEF")
     
     # Parallel lines mean equal angles
-    def paraABCD_eqangleABCDCB(self, para_rel: Parallel) -> Optional[Parallel]:
+    def paraABCD_eqangleABCDCB(self, para_rel: Parallel) -> Optional[EqualAngle]:
         # Parse parallel relation
         line1, line2 = list(para_rel.relation)
-        A, B = line1
-        C, D = line2
+        A, B = list(line1)
+        C, D = list(line2)
+        
+        # Check that the four points are not all collinear
+        # If they are collinear, then the "parallel lines" are the same line
+        all_points = {A, B, C, D}
+        if len(all_points) < 4:
+            return None  # Duplicate points
+            
+        # Check if all points lie on the same line by looking for collinear relations
+        collinears = self.problem.relations.get("col", [])
+        for col_rel in collinears:
+            col_points = set(col_rel.relation)
+            if all_points.issubset(col_points):
+                return None  # All four points are collinear - not truly parallel lines
         
         # Create equal angle: angle ABC = angle DCB
         return EqualAngle(A, B, C, D, C, B,
                           parents=[para_rel], rule="paraABCD_eqangleABCDCB")
     
     # Collinear points mean equal angles
-    def colABC_eqangleABDBCD(self, col_rel: Collinear) -> Optional[Collinear]:
+    def colABC_eqangleABDBCD(self, col_rel: Collinear) -> List[RelationNode]:
+        new_relations = []
         points = list(col_rel.relation)
         if len(points) == 3:
             A, B, C = points[0], points[1], points[2]
 
-            # Adding in a point D not on line ABC(technically all such points would get accounted for by repeatedly calling this rule)
+            # Adding in a point D not on line ABC for each point not on the line
             for D in self.problem.points:
                 if D not in points:
-                    return EqualAngle(A, B, D, B, C, D,
-                                      parents=[col_rel], rule="colABC_eqangleABDBCD")
-        return None
+                    new_relations.append(EqualAngle(A, B, D, B, C, D,
+                                      parents=[col_rel], rule="colABC_eqangleABDBCD"))
+        return new_relations
 
     def cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE(self, cong1: Congruent, cong2: Congruent, 
                           eqangle: EqualAngle, sameclock: Sameclock) -> Optional[CongruentTriangle1]:

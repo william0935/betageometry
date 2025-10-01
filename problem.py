@@ -43,10 +43,6 @@ class Problem:
     def add_relation(self, relation: RelationNode):
         if not relation.name in RELATION_TYPES:
             raise ValueError(f"Relation type {relation.name} not recognized.")
-        
-        for existing in self.relations[relation.name]:
-            if existing.relation == relation.relation:
-                return
             
         if relation.index is None:
             relation.add_index(self.index_counter)

@@ -318,8 +318,10 @@ def combine_lines_and_segments_dictionaries(
 
 
 
-
 def parse_picture(filename: str):
+    """
+    Parses a GeoGebra (.ggb) file and returns points, lines, and circles
+    """
     # Build a path to the .ggb file inside "Geogebra Files"
     script_dir = os.path.dirname(os.path.abspath(__file__))
     ggb_path = os.path.join(script_dir, "Geogebra Files", filename)

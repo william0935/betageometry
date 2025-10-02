@@ -11,10 +11,11 @@ class DeductiveDatabase:
         # Rule database - each rule is a method that returns List[RelationNode]
         # ADD THE NEW RULES HERE
         self.rules = [
-            self.apply_congABCD_congCDEF_congABEF,
-            self.apply_paraABCD_eqangleABCDCB,
-            self.apply_colABC_eqangleABDBCD,
-            self.apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE,
+            self.apply_congABCD_congCDEF__congABEF,
+            self.apply_paraABCD__eqangleABCDCB,
+            self.apply_colABC__eqangleABDBCD,
+            self.apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF,
+            self.apply_paraABCD_paraADBC__congABCD_congADBC
         ]
 
     def is_relation_new(self, relation: RelationNode) -> bool:
@@ -54,41 +55,54 @@ class DeductiveDatabase:
                 
         return self.problem.is_solved()
     
-    # Rule: congruence of segments
-    def apply_congABCD_congCDEF_congABEF(self) -> List[RelationNode]:
+    def apply_paraABCD_paraADBC__congABCD_congADBC(self) -> List[RelationNode]:
+        """Parallelogram has equal opposite sides"""
+        new_relations = []
+        parallels = self.problem.relations.get("para", [])
+
+        for i in range(len(parallels)):
+            for j in range(i + 1, len(parallels)):
+                cong_rels = self.paraABCD_paraADBC__congABCD_congADBC(parallels[i], parallels[j])
+                if cong_rels:  # Check if not None
+                    for cong_rel in cong_rels:  # Iterate through the list
+                        new_relations.append(cong_rel)  # Append each Congruent individually
+        return new_relations
+    
+    def apply_congABCD_congCDEF__congABEF(self) -> List[RelationNode]:
+        """Transitive property of congruence of segments"""
         new_relations = []
         congruences = self.problem.relations.get("cong", [])
         
         for i in range(len(congruences)):
             for j in range(i + 1, len(congruences)):
-                transitive_rel = self.congABCD_congCDEF_congABEF(congruences[i], congruences[j])
+                transitive_rel = self.congABCD_congCDEF__congABEF(congruences[i], congruences[j])
                 if transitive_rel:
                     new_relations.append(transitive_rel)
         return new_relations
 
-    # Rule: parallel lines -> equal angles
-    def apply_paraABCD_eqangleABCDCB(self) -> List[RelationNode]:
+    def apply_paraABCD__eqangleABCDCB(self) -> List[RelationNode]:
+        """Parallel lines mean equal angles"""
         new_relations = []
         parallels = self.problem.relations.get("para", [])
         
         for para_rel in parallels:
-            angle_rel = self.paraABCD_eqangleABCDCB(para_rel)
+            angle_rel = self.paraABCD__eqangleABCDCB(para_rel)
             if angle_rel:
                 new_relations.append(angle_rel)
         return new_relations
     
-    # Rule: collinear points -> equal angles
-    def apply_colABC_eqangleABDBCD(self) -> List[RelationNode]:
+    def apply_colABC__eqangleABDBCD(self) -> List[RelationNode]:
+        """Collinear points mean equal angles"""
         new_relations = []
         collinears = self.problem.relations.get("col", [])
         
         for col_rel in collinears:
-            angle_rels = self.colABC_eqangleABDBCD(col_rel)
+            angle_rels = self.colABC__eqangleABDBCD(col_rel)
             new_relations.extend(angle_rels)
         return new_relations
     
-    # Rule: Triangle congruence SAS
-    def apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE(self) -> List[RelationNode]:
+    def apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF(self) -> List[RelationNode]:
+        """Triangle congruence SAS"""
         new_relations = []
         congruences = self.problem.relations.get("cong", [])
         eqangles = self.problem.relations.get("eqangle", [])
@@ -170,7 +184,7 @@ class DeductiveDatabase:
                         
                         # All filters passed - now call the function
                         for sameclock in valid_sameclocks:
-                            contri_rel = self.cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE(cong1, cong2, eqangle, sameclock)
+                            contri_rel = self.cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF(cong1, cong2, eqangle, sameclock)
                             if contri_rel:
                                 new_relations.append(contri_rel)
         return new_relations
@@ -179,8 +193,46 @@ class DeductiveDatabase:
     Helper methods for specific rules starts here.
     """
 
+    def paraABCD_paraADBC__congABCD_congADBC(self, para1: Parallel, para2: Parallel) -> Optional[List[Congruent]]:
+        """Parallelogram has equal opposite sides"""
+        # Get the lines from the parallel relations
+        line1, line2 = list(para1.relation)
+        line3, line4 = list(para2.relation)
+        
+        # Convert frozensets to lists so we can index them
+        line1_points = list(line1)
+        line2_points = list(line2)
+        line3_points = list(line3)
+        line4_points = list(line4)
+        
+        # Check if lines properly intersect to form a quadrilateral
+        # line1 and line3 should meet at a point, line2 and line4 should meet at a point
+        line1_set = set(line1_points)
+        line2_set = set(line2_points)
+        line3_set = set(line3_points)
+        line4_set = set(line4_points)
+        intersection_13 = line1_set.intersection(line3_set)
+        intersection_24 = line2_set.intersection(line4_set)
+        
+        # For a proper quadrilateral, each pair should intersect at exactly one point
+        if len(intersection_13) != 1 or len(intersection_24) != 1:
+            return None
+        
+        # Get all unique points from both parallel relations
+        all_points = set(line1_points + line2_points + line3_points + line4_points)
+        
+        if len(all_points) != 4:
+            return None  # Not a proper quadrilateral
+        
+        # For a parallelogram, opposite sides are congruent
+        if len(line1_points) == 2 and len(line2_points) == 2:
+            return [Congruent(line1_points[0], line1_points[1], line2_points[0], line2_points[1], parents=[para1, para2], rule="paraABCD_paraADBC__congABCD_congADBC"),
+                    Congruent(line3_points[0], line3_points[1], line4_points[0], line4_points[1], parents=[para1, para2], rule="paraABCD_paraADBC__congABCD_congADBC")]
+
+        return None
+
     # Congruent segments
-    def congABCD_congCDEF_congABEF(self, cong1: Congruent, cong2: Congruent) -> Optional[Congruent]:
+    def congABCD_congCDEF__congABEF(self, cong1: Congruent, cong2: Congruent) -> Optional[Congruent]:
         seg1, seg2 = list(cong1.relation)
         seg3, seg4 = list(cong2.relation)
         
@@ -201,10 +253,10 @@ class DeductiveDatabase:
             return None  # No shared segment found
             
         return Congruent(points1[0], points1[1], points2[0], points2[1],
-                         parents=[cong1, cong2], rule="congABCD_congCDEF_congABEF")
+                         parents=[cong1, cong2], rule="congABCD_congCDEF__congABEF")
     
     # Parallel lines mean equal angles
-    def paraABCD_eqangleABCDCB(self, para_rel: Parallel) -> Optional[EqualAngle]:
+    def paraABCD__eqangleABCDCB(self, para_rel: Parallel) -> Optional[EqualAngle]:
         # Parse parallel relation
         line1, line2 = list(para_rel.relation)
         A, B = list(line1)
@@ -225,10 +277,10 @@ class DeductiveDatabase:
         
         # Create equal angle: angle ABC = angle DCB
         return EqualAngle(A, B, C, D, C, B,
-                          parents=[para_rel], rule="paraABCD_eqangleABCDCB")
+                          parents=[para_rel], rule="paraABCD__eqangleABCDCB")
     
     # Collinear points mean equal angles
-    def colABC_eqangleABDBCD(self, col_rel: Collinear) -> List[RelationNode]:
+    def colABC__eqangleABDBCD(self, col_rel: Collinear) -> List[RelationNode]:
         new_relations = []
         points = list(col_rel.relation)
         if len(points) == 3:
@@ -238,11 +290,12 @@ class DeductiveDatabase:
             for D in self.problem.points:
                 if D not in points:
                     new_relations.append(EqualAngle(A, B, D, B, C, D,
-                                      parents=[col_rel], rule="colABC_eqangleABDBCD"))
+                                      parents=[col_rel], rule="colABC__eqangleABDBCD"))
         return new_relations
 
-    def cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE(self, cong1: Congruent, cong2: Congruent, 
+    def cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF(self, cong1: Congruent, cong2: Congruent, 
                           eqangle: EqualAngle, sameclock: Sameclock) -> Optional[CongruentTriangle1]:
+        """SAS Triangle congruence: Side-Angle-Side"""
         # Extract segments from congruences
         seg1_1, seg1_2 = list(cong1.relation)  # AB ≅ DE
         seg2_1, seg2_2 = list(cong2.relation)  # BC ≅ EF
@@ -252,14 +305,164 @@ class DeductiveDatabase:
         points1_2 = list(seg1_2)  # [D, E]
         points2_1 = list(seg2_1)  # [B, C]
         points2_2 = list(seg2_2)  # [E, F]
-                
-        # Triangle 1: A, B, C
+        
+        # For SAS, we need to verify that the two congruent sides share a vertex,
+        # and that the equal angle is at that shared vertex
+        
+        # Find shared vertices between the two congruent sides
+        shared_vertex_tri1 = None
+        shared_vertex_tri2 = None
+        
+        # Check if segments share a vertex in triangle 1
+        side1_set = set(points1_1)  # {A, B}
+        side2_set = set(points2_1)  # {B, C}
+        shared_tri1 = side1_set.intersection(side2_set)
+        
+        # Check if segments share a vertex in triangle 2
+        side3_set = set(points1_2)  # {D, E}
+        side4_set = set(points2_2)  # {E, F}
+        shared_tri2 = side3_set.intersection(side4_set)
+        
+        if len(shared_tri1) != 1 or len(shared_tri2) != 1:
+            return None  # Sides don't share exactly one vertex each
+            
+        shared_vertex_tri1 = list(shared_tri1)[0]  # Should be B
+        shared_vertex_tri2 = list(shared_tri2)[0]  # Should be E
+        
+        # Extract angles from the EqualAngle relation
+        # EqualAngle relation contains two angle tuples: ((p1,p2), (p2,p3)) and ((p4,p5), (p5,p6))
+        eqangle_tuples = list(eqangle.relation)
+        angle1 = eqangle_tuples[0]  # First angle
+        angle2 = eqangle_tuples[1]  # Second angle
+        
+        # Find the vertex of each angle (the shared point between the two sides)
+        def find_angle_vertex(angle_tuple):
+            side1, side2 = angle_tuple
+            side1_points = set(side1)
+            side2_points = set(side2)
+            intersection = side1_points.intersection(side2_points)
+            return list(intersection)[0] if len(intersection) == 1 else None
+        
+        vertex1 = find_angle_vertex(angle1)  # Vertex of first angle
+        vertex2 = find_angle_vertex(angle2)  # Vertex of second angle
+        
+        # For SAS: the equal angle must be at the shared vertex of the two congruent sides
+        if vertex1 != shared_vertex_tri1 or vertex2 != shared_vertex_tri2:
+            return None  # The angle is not between the congruent sides (not SAS pattern)
+        
+        # Verify that the angle arms correspond to the congruent sides
+        def get_angle_arms(angle_tuple):
+            side1, side2 = angle_tuple
+            return set(side1), set(side2)
+        
+        arms1_1, arms1_2 = get_angle_arms(angle1)  # Arms of angle at shared_vertex_tri1
+        arms2_1, arms2_2 = get_angle_arms(angle2)  # Arms of angle at shared_vertex_tri2
+        
+        # The angle arms should match the congruent sides
+        angle1_arms = {arms1_1, arms1_2}
+        angle2_arms = {arms2_1, arms2_2}
+        congruent_sides_tri1 = {side1_set, side2_set}
+        congruent_sides_tri2 = {side3_set, side4_set}
+        
+        if angle1_arms != congruent_sides_tri1 or angle2_arms != congruent_sides_tri2:
+            return None  # Angle arms don't match the congruent sides
+        
+        # If we get here, we have valid SAS pattern
+        # Build the triangles
         triangle1_points = list(set(points1_1 + points2_1))
-        # Triangle 2: D, E, F
         triangle2_points = list(set(points1_2 + points2_2))
         
         if len(triangle1_points) == 3 and len(triangle2_points) == 3:
             return CongruentTriangle1(*triangle1_points, *triangle2_points,
                                     parents=[cong1, cong2, eqangle, sameclock],
-                                    rule="cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDE")
+                                    rule="cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDEF__contri1ABCDEF")
+        return None
+
+    def cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF(self, cong1: Congruent,
+                eqangle1: EqualAngle, eqangle2: EqualAngle, sameclock: Sameclock) -> Optional[CongruentTriangle1]:
+        """ASA Triangle congruence: Angle-Side-Angle"""
+        # Extract segments from congruence
+        seg1_1, seg1_2 = list(cong1.relation)  # AB ≅ DE
+
+        # Extract points
+        points1_1 = list(seg1_1)  # [A, B]
+        points1_2 = list(seg1_2)  # [D, E]
+        
+        # Extract points from angles
+        # EqualAngle relation contains two angle tuples: ((p1,p2), (p2,p3)) and ((p4,p5), (p5,p6))
+        eqangle1_tuples = list(eqangle1.relation)  # [((C,A), (A,B)), ((F,D), (D,E))] for angle CAB = angle FDE
+        eqangle2_tuples = list(eqangle2.relation)  # [((C,B), (B,A)), ((F,E), (E,D))] for angle CBA = angle FED
+        
+        # Extract individual angle points
+        angle1_1 = eqangle1_tuples[0]  # ((C,A), (A,B)) - first angle
+        angle1_2 = eqangle1_tuples[1]  # ((F,D), (D,E)) - second angle
+        angle2_1 = eqangle2_tuples[0]  # ((C,B), (B,A)) - first angle
+        angle2_2 = eqangle2_tuples[1]  # ((F,E), (E,D)) - second angle
+        
+        # For ASA, we need to verify that the congruent side is BETWEEN the two equal angles
+        # This means both angles should share the endpoints of the congruent side as their vertices
+        
+        # Extract the vertices and sides of each angle more carefully
+        # angle1_1: ((C,A), (A,B)) means angle CAB with vertex A
+        # angle1_2: ((F,D), (D,E)) means angle FDE with vertex D
+        
+        # Find the vertex of each angle (the shared point between the two sides)
+        def find_angle_vertex(angle_tuple):
+            side1, side2 = angle_tuple
+            side1_points = set(side1)
+            side2_points = set(side2)
+            intersection = side1_points.intersection(side2_points)
+            return list(intersection)[0] if len(intersection) == 1 else None
+        
+        vertex1_1 = find_angle_vertex(angle1_1)  # Should be A
+        vertex1_2 = find_angle_vertex(angle1_2)  # Should be D
+        vertex2_1 = find_angle_vertex(angle2_1)  # Should be B
+        vertex2_2 = find_angle_vertex(angle2_2)  # Should be E
+        
+        # For ASA: the congruent side AB should be between two angles
+        # This means one angle has vertex A, another has vertex B (for triangle 1)
+        # and correspondingly one angle has vertex D, another has vertex E (for triangle 2)
+        
+        congruent_side_vertices1 = set(points1_1)  # {A, B}
+        congruent_side_vertices2 = set(points1_2)  # {D, E}
+        
+        # Check if the angle vertices match the congruent side endpoints
+        angle_vertices1 = {vertex1_1, vertex2_1}  # {A, B} should match congruent side
+        angle_vertices2 = {vertex1_2, vertex2_2}  # {D, E} should match congruent side
+        
+        if angle_vertices1 != congruent_side_vertices1 or angle_vertices2 != congruent_side_vertices2:
+            return None  # The side is not between the angles (not ASA pattern)
+        
+        # If we get here, we have valid ASA pattern
+        # Build the triangles by finding the third vertex from each angle
+        def get_third_vertex(angle_tuple, vertex):
+            side1, side2 = angle_tuple
+            all_points = set(side1).union(set(side2))
+            third_vertices = all_points - {vertex}
+            return list(third_vertices)  # Should be 2 points for the two arms of the angle
+        
+        # Get third vertices for triangle 1
+        third_vertices1_1 = get_third_vertex(angle1_1, vertex1_1)  # From angle at A
+        third_vertices2_1 = get_third_vertex(angle2_1, vertex2_1)  # From angle at B
+        
+        # Get third vertices for triangle 2  
+        third_vertices1_2 = get_third_vertex(angle1_2, vertex1_2)  # From angle at D
+        third_vertices2_2 = get_third_vertex(angle2_2, vertex2_2)  # From angle at E
+        
+        # The third vertex of triangle 1 should be the intersection of the angle arms
+        triangle1_third = (set(third_vertices1_1).intersection(set(third_vertices2_1)))
+        triangle2_third = (set(third_vertices1_2).intersection(set(third_vertices2_2)))
+        
+        if len(triangle1_third) != 1 or len(triangle2_third) != 1:
+            return None  # Angles don't properly define triangles
+        
+        # Build final triangles
+        triangle1_points = list(congruent_side_vertices1) + list(triangle1_third)
+        triangle2_points = list(congruent_side_vertices2) + list(triangle2_third)
+        
+        # Check that we have valid triangles with exactly 3 points each
+        if len(triangle1_points) == 3 and len(triangle2_points) == 3:
+            return CongruentTriangle1(*triangle1_points, *triangle2_points,
+                                    parents=[cong1, eqangle1, eqangle2, sameclock],
+                                    rule="cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF")
         return None

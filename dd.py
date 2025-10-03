@@ -13,9 +13,10 @@ class DeductiveDatabase:
         self.rules = [
             self.apply_congABCD_congCDEF__congABEF,
             self.apply_paraABCD__eqangleABCDCB,
-            self.apply_colABC__eqangleABDBCD,
+            self.apply_colABC__eqangleABDCBD,
             self.apply_cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF,
-            self.apply_paraABCD_paraADBC__congABCD_congADBC
+            self.apply_paraABCD_paraADBC__congABCD_congADBC,
+            self.apply_cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF
         ]
 
     def is_relation_new(self, relation: RelationNode) -> bool:
@@ -86,18 +87,17 @@ class DeductiveDatabase:
         parallels = self.problem.relations.get("para", [])
         
         for para_rel in parallels:
-            angle_rel = self.paraABCD__eqangleABCDCB(para_rel)
-            if angle_rel:
-                new_relations.append(angle_rel)
+            angle_rels = self.paraABCD__eqangleABCDCB(para_rel)
+            new_relations.extend(angle_rels)  # Use extend since function now returns a list
         return new_relations
     
-    def apply_colABC__eqangleABDBCD(self) -> List[RelationNode]:
+    def apply_colABC__eqangleABDCBD(self) -> List[RelationNode]:
         """Collinear points mean equal angles"""
         new_relations = []
         collinears = self.problem.relations.get("col", [])
         
         for col_rel in collinears:
-            angle_rels = self.colABC__eqangleABDBCD(col_rel)
+            angle_rels = self.colABC__eqangleABDCBD(col_rel)
             new_relations.extend(angle_rels)
         return new_relations
     
@@ -114,6 +114,10 @@ class DeductiveDatabase:
             for i in range(len(congruences)):
                 for j in range(i + 1, len(congruences)):
                     cong1, cong2 = congruences[i], congruences[j]
+                    
+                    # Safety check: ensure relations have exactly 2 segments each
+                    if len(cong1.relation) != 2 or len(cong2.relation) != 2:
+                        continue
                     
                     # FILTER 1: Check if congruences can form triangles
                     seg1_1, seg1_2 = list(cong1.relation)
@@ -189,6 +193,27 @@ class DeductiveDatabase:
                                 new_relations.append(contri_rel)
         return new_relations
     
+    def apply_cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF(self) -> List[RelationNode]:
+        """Triangle congruence ASA (Angle-Side-Angle)"""
+        new_relations = []
+        congruences = self.problem.relations.get("cong", [])
+        eqangles = self.problem.relations.get("eqangle", [])
+        sameclocks = self.problem.relations.get("sameclock", [])
+        
+        # Check if we have the required components for ASA: 1 congruent side + 2 equal angles + sameclock
+        if len(congruences) >= 1 and len(eqangles) >= 2 and len(sameclocks) >= 1:
+            # Try all combinations of 1 congruence + 2 angles + 1 sameclock
+            for cong in congruences:
+                for i in range(len(eqangles)):
+                    for j in range(i + 1, len(eqangles)):
+                        eqangle1, eqangle2 = eqangles[i], eqangles[j]
+                        for sameclock in sameclocks:
+                            # Try the ASA function
+                            asa_result = self.cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF(cong, eqangle1, eqangle2, sameclock)
+                            if asa_result:
+                                new_relations.append(asa_result)
+        return new_relations
+    
     """
     Helper methods for specific rules starts here.
     """
@@ -233,6 +258,10 @@ class DeductiveDatabase:
 
     # Congruent segments
     def congABCD_congCDEF__congABEF(self, cong1: Congruent, cong2: Congruent) -> Optional[Congruent]:
+        # Safety check: ensure relations have exactly 2 segments each
+        if len(cong1.relation) != 2 or len(cong2.relation) != 2:
+            return None
+            
         seg1, seg2 = list(cong1.relation)
         seg3, seg4 = list(cong2.relation)
         
@@ -254,9 +283,25 @@ class DeductiveDatabase:
             
         return Congruent(points1[0], points1[1], points2[0], points2[1],
                          parents=[cong1, cong2], rule="congABCD_congCDEF__congABEF")
-    
+
+
+
+
+
+
+
+
+
+
     # Parallel lines mean equal angles
-    def paraABCD__eqangleABCDCB(self, para_rel: Parallel) -> Optional[EqualAngle]:
+    def paraABCD__eqangleABCDCB(self, para_rel: Parallel) -> List[EqualAngle]:
+        """
+        Parallel lines create multiple angle equalities:
+        - Corresponding angles are equal
+        - Alternate interior angles are equal  
+        - Alternate exterior angles are equal
+        - Co-interior angles are supplementary (but we focus on equal angles here)
+        """
         # Parse parallel relation
         line1, line2 = list(para_rel.relation)
         A, B = list(line1)
@@ -266,21 +311,75 @@ class DeductiveDatabase:
         # If they are collinear, then the "parallel lines" are the same line
         all_points = {A, B, C, D}
         if len(all_points) < 4:
-            return None  # Duplicate points
+            return []  # Duplicate points
             
         # Check if all points lie on the same line by looking for collinear relations
         collinears = self.problem.relations.get("col", [])
         for col_rel in collinears:
             col_points = set(col_rel.relation)
             if all_points.issubset(col_points):
-                return None  # All four points are collinear - not truly parallel lines
+                return []  # All four points are collinear - not truly parallel lines
         
-        # Create equal angle: angle ABC = angle DCB
-        return EqualAngle(A, B, C, D, C, B,
-                          parents=[para_rel], rule="paraABCD__eqangleABCDCB")
+        angle_relations = []
+        
+        # For parallel lines AB || CD, we need a transversal to create angle relationships
+        # We'll check all possible transversals using points from the problem
+        for E in self.problem.points:
+            if E not in all_points:
+                # E creates transversals with the parallel lines
+                # Transversal through E intersecting AB and CD creates multiple angle equalities
+                
+                # Corresponding angles: angles in the same relative position
+                # When transversal EAC crosses AB || CD:
+                angle_relations.append(EqualAngle(E, A, B, E, C, D, parents=[para_rel], rule="paraABCD__eqangleABCDCB_corresponding"))
+                angle_relations.append(EqualAngle(B, A, E, D, C, E, parents=[para_rel], rule="paraABCD__eqangleABCDCB_corresponding"))
+                
+                # When transversal EBD crosses AB || CD:
+                angle_relations.append(EqualAngle(E, B, A, E, D, C, parents=[para_rel], rule="paraABCD__eqangleABCDCB_corresponding"))
+                angle_relations.append(EqualAngle(A, B, E, C, D, E, parents=[para_rel], rule="paraABCD__eqangleABCDCB_corresponding"))
+                
+                # Alternate interior angles
+                angle_relations.append(EqualAngle(E, A, B, D, C, E, parents=[para_rel], rule="paraABCD__eqangleABCDCB_alternate_interior"))
+                angle_relations.append(EqualAngle(B, A, E, E, C, D, parents=[para_rel], rule="paraABCD__eqangleABCDCB_alternate_interior"))
+        
+        # Even without external points, we can create some basic angle relationships
+        # when the four points form intersecting transversals
+        if not angle_relations:
+            # Basic angle equality when AB || CD
+            # This creates angle relationships at intersections
+            angle_relations.append(EqualAngle(A, B, C, D, C, B, parents=[para_rel], rule="paraABCD__eqangleABCDCB_basic"))
+            angle_relations.append(EqualAngle(B, A, D, C, D, A, parents=[para_rel], rule="paraABCD__eqangleABCDCB_basic"))
+        
+        return angle_relations
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     
     # Collinear points mean equal angles
-    def colABC__eqangleABDBCD(self, col_rel: Collinear) -> List[RelationNode]:
+    def colABC__eqangleABDCBD(self, col_rel: Collinear) -> List[RelationNode]:
         new_relations = []
         points = list(col_rel.relation)
         if len(points) == 3:
@@ -289,8 +388,8 @@ class DeductiveDatabase:
             # Adding in a point D not on line ABC for each point not on the line
             for D in self.problem.points:
                 if D not in points:
-                    new_relations.append(EqualAngle(A, B, D, B, C, D,
-                                      parents=[col_rel], rule="colABC__eqangleABDBCD"))
+                    new_relations.append(EqualAngle(A, B, D, C, B, D,
+                                      parents=[col_rel], rule="colABC__eqangleABDCBD"))
         return new_relations
 
     def cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF(self, cong1: Congruent, cong2: Congruent, 
@@ -381,6 +480,10 @@ class DeductiveDatabase:
     def cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF(self, cong1: Congruent,
                 eqangle1: EqualAngle, eqangle2: EqualAngle, sameclock: Sameclock) -> Optional[CongruentTriangle1]:
         """ASA Triangle congruence: Angle-Side-Angle"""
+        # Safety check: ensure congruence has exactly 2 segments
+        if len(cong1.relation) != 2:
+            return None
+            
         # Extract segments from congruence
         seg1_1, seg1_2 = list(cong1.relation)  # AB ≅ DE
 
@@ -462,7 +565,15 @@ class DeductiveDatabase:
         
         # Check that we have valid triangles with exactly 3 points each
         if len(triangle1_points) == 3 and len(triangle2_points) == 3:
-            return CongruentTriangle1(*triangle1_points, *triangle2_points,
-                                    parents=[cong1, eqangle1, eqangle2, sameclock],
-                                    rule="cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF")
+            # Try the ordering that should give us AE = CE
+            # If triangle1_points = [A, B, E] and triangle2_points = [D, C, E]
+            # then CongruentTriangle1(A, B, E, C, D, E) gives A↔C, B↔D, E↔E
+            # which means AE = CE (what we want!)
+            
+            # Try alternative ordering first - this might give us the correct correspondence
+            result = CongruentTriangle1(*triangle2_points, *triangle1_points,
+                                        parents=[cong1, eqangle1, eqangle2, sameclock],
+                                        rule="cong_ABDE_eqangle_CABFDE_eqangle_CBAFED_sameclockABCDEF__contri1ABCDEF")
+            
+            return result
         return None

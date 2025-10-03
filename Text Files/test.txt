@@ -1,0 +1,1 @@
+para A B C D; para B C D A; col A E C; col B E D; sameclock A B E E C D; ? cong A E E C

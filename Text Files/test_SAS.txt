@@ -1,0 +1,1 @@
+midp C A D; midp C B E; ? cong A B D E

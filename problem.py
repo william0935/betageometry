@@ -1,8 +1,8 @@
 ## Create the Problem data structure
 from relations import *
 
-RELATION_TYPES = ["cong", "eqangle", "sameclock", "para", "perp", "col", "cyclic",
-                  "simtri1", "simtri2", "contri1", "contri2", "midp", "eqratio"]
+RELATION_TYPES = ["cong", "eqangle", "para", "perp", "col", "cyclic", "eqratio",
+                  "simtri1", "simtri2", "contri1", "contri2", "midp"]
 
 class Problem:
     def __init__(self, name: str, points: List[Point],
@@ -40,21 +40,48 @@ class Problem:
     def is_solved(self):
         return self.solved
     
-    def add_relation(self, relation: RelationNode):
+    def add_relation(self, relation: RelationNode) -> Optional[List[RelationNode]]:
+        new_relations = []
         if not relation.name in RELATION_TYPES:
             raise ValueError(f"Relation type {relation.name} not recognized.")
-            
+        
+        if self.is_relation_trivial(relation):
+            return None
+
+        for existing in self.relations[relation.name]:
+            if existing.relation == relation.relation:
+                return None
+
         if relation.index is None:
             relation.add_index(self.index_counter)
             self.index_counter += 1
 
         self.relations[relation.name].append(relation)
+        new_relations.append(relation)
 
         if relation.equivalent:
             for eq in relation.equivalent:
-                self.add_relation(eq)
+                new_rel = self.add_relation(eq)
+                if new_rel:
+                    new_relations.extend(new_rel)
 
-        if relation in self.goals:
-            self.goals.remove(relation)
-            if not self.goals:
-                self.solved = True
+        for goal in self.goals:
+            if goal.relation == relation.relation:
+                self.goals.remove(goal)
+                if not self.goals:
+                    self.solved = True
+                break
+
+        return new_relations
+
+    def is_relation_trivial(self, relation: RelationNode) -> bool:
+        if relation.name == "cong":
+            p1, p2, p3, p4 = relation.points
+            return set({p1, p2}) == set({p3, p4})
+        elif relation.name == "eqangle":
+            p1, p2, p3, p4, p5, p6 = relation.points
+            return (frozenset({p1, p2}), frozenset({p2, p3})) == (frozenset({p4, p5}), frozenset({p5, p6}))
+        elif relation.name == "contri1" or relation.name == "contri2":
+            p1, p2, p3, p4, p5, p6 = relation.points
+            return (p1, p2, p3) == (p4, p5, p6)
+        return False

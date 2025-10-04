@@ -43,8 +43,8 @@ def get_relation(rel_str, all_points):
         relation = Midpoint(points[0], points[1], points[2])
     elif word == 'perp':
         relation = Perpendicular(points[0], points[1], points[2], points[3])
-    elif word == 'sameclock':
-        relation = Sameclock(points[0], points[1], points[2], points[3], points[4], points[5])
+    # elif word == 'sameclock':
+    #     relation = Sameclock(points[0], points[1], points[2], points[3], points[4], points[5])
     elif word == 'cyclic':
         relation = Cyclic(points[0], points[1], points[2], points[3])
     elif word == 'simtri1':

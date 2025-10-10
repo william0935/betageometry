@@ -1,0 +1,1 @@
+cong O A O B; cong O A O C; perp O B B D; eqangle A O C C O B; col A O E; cyclic A B E C; cong O A O E; ? eqangle A B C C B D

@@ -4,6 +4,7 @@ from read_in_relations import *
 from read_in_geogebra import *
 from constructions import *
 from dd import *
+from dd_ar import *
 from problem import *
 from matplotlib import pyplot as plt
 
@@ -31,7 +32,8 @@ assumptions, goals = read_in_relations(f"{problem_name}.txt", points)
 # create the problem
 problem = Problem(problem_name, points, assumptions, goals)
 
-# call dd.py until solved
-solver = DeductiveDatabase(problem)
+# call dd.py or dd_ar.py until solved
+solver = DDWithAR(problem)
+# solver = DeductiveDatabase(problem)
 solver.apply_deduction_rules(50)
 print(solver.problem)

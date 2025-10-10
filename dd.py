@@ -556,7 +556,63 @@ class DeductiveDatabase:
             )])
 
         return new_relations
+        
+    def congOAOB_congOBOC_colOAB__perpACBC(self) -> List[RelationNode]:
+        new_relations = []
+        congruences = self.problem.relations.get("cong", [])
+        collinears = self.problem.relations.get("col", [])
+        
+        for i in range(len(congruences)):
+            cong1 = congruences[i]
+            p1, p2, p3, p4 = cong1.points
+            if p1 == p4:
+                p3, p4 = p4, p3
+            elif p2 == p3:
+                p1, p2 = p2, p1
+            elif p2 == p4:
+                p1, p2, p3, p4 = p2, p1, p4, p3
+            elif p1 == p3:
+                pass
+            else:
+                continue
 
+            for j in range(i + 1, len(congruences)):
+                cong2 = congruences[j]
+                p5, p6, p7, p8 = cong2.points
+                if len({p1, p2, p3, p4, p5, p6, p7, p8}) != 4:
+                    continue
+
+                if p5 == p8:
+                    p7, p8 = p8, p7
+                elif p6 == p7:
+                    p5, p6 = p6, p5
+                elif p6 == p8:
+                    p5, p6, p7, p8 = p6, p5, p8, p7
+                elif p5 == p7:
+                    pass
+                else:
+                    continue
+                
+                if p2 != p6:
+                    p5, p6, p7, p8 = p7, p8, p5, p6
+
+                if p1 != p5 or p2 != p6 or p4 == p8:
+                    continue
+
+                col = next((c for c in collinears if set({p1, p2, p4}) == set(c.points)), None)
+                if not col:
+                    p1, p2, p3, p4, p5, p6, p7, p8 = p5, p6, p7, p8, p1, p2, p3, p4
+                    col = next((c for c in collinears if set({p1, p2, p4}) == set(c.points)), None)
+                    if not col:
+                        continue
+
+                new_relations.append(Perpendicular(
+                    p2, p8, p4, p8,
+                    parents=[cong1, cong2, col],
+                    rule="congOAOB_congOBOC_colOAB__perpACBC"
+                ))
+
+        return new_relations
 
 
     """

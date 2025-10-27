@@ -1,6 +1,6 @@
 import itertools
 from relations import *
-from problem import Problem
+from Problem import Problem
 from typing import List, Tuple, Optional
 
 
@@ -15,16 +15,21 @@ class DeductiveDatabase:
             self.eqangleABCDEF_eqangleDEFGHI__eqangleABCGHI,
             self.eqangleABCDEF_eqangleFEDIHG__eqangleABCGHI,
             self.colABC__eqangleACDBCD_eqangleABDCBD_eqangleBADCAD,
-            self.congMAMB_colMAB__midpointMAB,
-            self.cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF,
-            self.cong_ABDE_congBCEF_eqangleABCFED_sameclockABCFED__contri2ABCDEF,
-            self.cong_ABDE_eqangleABCDEF_eqangleCABFDE_sameclockABCDEF__contri1ABCDEF,
-            self.cong_ABDE_eqangleABCFED_eqangleCABDFE_sameclockABCFED__contri2ABCDEF,
+            self.congMAMB_colMAB__midpMAB,
+            self.congABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF,
+            self.congABDE_congBCEF_eqangleABCFED_sameclockABCFED__contri2ABCDEF,
+            self.congABDE_eqangleABCDEF_eqangleCABFDE_sameclockABCDEF__contri1ABCDEF,
+            self.congABDE_eqangleABCFED_eqangleCABDFE_sameclockABCFED__contri2ABCDEF,
+            self.congABDE_congBCEF_congCAFD__contriABCDEF,
             self.eqangleABCDEF_eqangleCABFDE_sameclockABCDEF__simtri1ABCDEF,
             self.eqangleABCFED_eqangleCABDFE_sameclockABCFED__simtri2ABCDEF,
             self.eqratioABCDEFGH__eqratioABEFCDGH,
             self.congABEF_eqratioABCDEFGH__congCDGH,
-            self.eqratioABACDEDF_colABC_colDEF__eqratioABBCDEEF
+            self.paraABCD_colACE_colBDE__eqratioACCEBDDE,
+            self.eqratioABACDEDF_colABC_colDEF__eqratioABBCDEEF,
+            self.congOAOB_congOBOC_colOAB__perpACBC,
+            self.congOAOB_congOAOC_congOAOD__cyclicABCD,
+            self.midpMAB_midpNAC__paraMNBC
         ]
 
     
@@ -172,16 +177,16 @@ class DeductiveDatabase:
                 if p4 not in col_rel.points:
                     p1, p2, p3 = col_rel.points
                     new_rel = [
-                        EqualAngle(p1, p3, p4, p2, p3, p4, parents=[col_rel], rule="col_ABC__eqangle_ACDBCD"),
-                        EqualAngle(p1, p2, p4, p3, p2, p4, parents=[col_rel], rule="col_ABC__eqangle_ABDCBD"),
-                        EqualAngle(p2, p1, p4, p3, p1, p4, parents=[col_rel], rule="col_ABC__eqangle_BADCAD")
+                        EqualAngle(p1, p3, p4, p2, p3, p4, parents=[col_rel], rule="colABC__eqangleACDBCD"),
+                        EqualAngle(p1, p2, p4, p3, p2, p4, parents=[col_rel], rule="colABC__eqangleABDCBD"),
+                        EqualAngle(p2, p1, p4, p3, p1, p4, parents=[col_rel], rule="colABC__eqangleBADCAD")
                     ]
                     new_relations.extend(new_rel)
 
         return new_relations
 
     # Rule: congruent segments + collinear -> midpoint
-    def congMAMB_colMAB__midpointMAB(self) -> List[RelationNode]:
+    def congMAMB_colMAB__midpMAB(self) -> List[RelationNode]:
         new_relations = []
         congruences = self.problem.relations.get("cong", [])
         collinears = self.problem.relations.get("col", [])
@@ -204,13 +209,13 @@ class DeductiveDatabase:
                     new_relations.append(Midpoint(
                         p1, p2, p4,
                         parents=[cong, col],
-                        rule="cong_MAMB_col_MAB__midpoint_MAB"
+                        rule="congMAMB_colMAB__midpMAB"
                     ))
         
         return new_relations
     
     # Rule: triangle congruence SAS with same orientation
-    def cong_ABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF(self) -> List[RelationNode]:
+    def congABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF(self) -> List[RelationNode]:
         new_relations = []
         eqangles = self.problem.relations.get("eqangle", [])
         
@@ -232,13 +237,13 @@ class DeductiveDatabase:
                 new_relations.append(CongruentTriangle1(
                     p1, p2, p3, p4, p5, p6, 
                     parents=parents,
-                    rule="cong_ABDE_congBCEF_eqangleABCDEF_sameclock_ABCDEF__contri1ABCDEF"
+                    rule="congABDE_congBCEF_eqangleABCDEF_sameclockABCDEF__contri1ABCDEF"
                 ))
 
         return new_relations
 
     # Rule: triangle congruence SAS with opposite orientation
-    def cong_ABDE_congBCEF_eqangleABCFED_sameclockABCFED__contri2ABCDEF(self) -> List[RelationNode]:
+    def congABDE_congBCEF_eqangleABCFED_sameclockABCFED__contri2ABCDEF(self) -> List[RelationNode]:
         new_relations = []
         eqangles = self.problem.relations.get("eqangle", [])
         
@@ -260,13 +265,13 @@ class DeductiveDatabase:
                 new_relations.append(CongruentTriangle2(
                     p1, p2, p3, p4, p5, p6, 
                     parents=parents,
-                    rule="cong_ABDE_congBCEF_eqangleABCFED_sameclock_ABCFED__contri2ABCDEF"
+                    rule="congABDE_congBCEF_eqangleABCFED_sameclockABCFED__contri2ABCDEF"
                 ))
 
         return new_relations
     
     # Rule: triangle Congruence ASA/AAS
-    def cong_ABDE_eqangleABCDEF_eqangleCABFDE_sameclockABCDEF__contri1ABCDEF(self) -> List[RelationNode]:
+    def congABDE_eqangleABCDEF_eqangleCABFDE_sameclockABCDEF__contri1ABCDEF(self) -> List[RelationNode]:
         new_relations = []
         eqangles = self.problem.relations.get("eqangle", [])
         
@@ -307,13 +312,13 @@ class DeductiveDatabase:
                 new_relations.append(CongruentTriangle1(
                     p1, p2, p3, p4, p5, p6,
                     parents=parents,
-                    rule="cong_ABDE_eqangleABCDEF_eqangleCABFDE__contri1ABCDEF"
+                    rule="congABDE_eqangleABCDEF_eqangleCABFDE__contri1ABCDEF"
                 ))
 
         return new_relations
     
     # Rule: triangle congruence ASA/AAS with opposite orientation
-    def cong_ABDE_eqangleABCFED_eqangleCABDFE_sameclockABCFED__contri2ABCDEF(self) -> List[RelationNode]:
+    def congABDE_eqangleABCFED_eqangleCABDFE_sameclockABCFED__contri2ABCDEF(self) -> List[RelationNode]:
         new_relations = []
         eqangles = self.problem.relations.get("eqangle", [])
         
@@ -351,14 +356,109 @@ class DeductiveDatabase:
                 else:
                     continue
 
-                new_relations.append(CongruentTriangle1(
+                new_relations.append(CongruentTriangle2(
                     p1, p2, p3, p4, p5, p6,
                     parents=parents,
-                    rule="cong_ABDE_eqangleABCFED_eqangleCBAFED__contri2ABCDEF"
+                    rule="congABDE_eqangleABCFED_eqangleCBAFED__contri2ABCDEF"
                 ))
 
         return new_relations
     
+    # Rule: triangle congruence SSS
+    def congABDE_congBCEF_congCAFD__contriABCDEF(self):
+        new_relations = []
+        congruences = self.problem.relations.get("cong", [])
+        for i in range(len(congruences)):
+            p1, p2, p3, p4 = congruences[i].points
+            for j in range(i + 1, len(congruences)):
+                p5, p6, p7, p8 = congruences[j].points
+                if len({p1, p2, p5, p6}) == 3 and len({p3, p4, p7, p8}) == 3:
+                    if p1 == p5:
+                        pass
+                    elif p1 == p6:
+                        p5, p6 = p6, p5
+                    elif p2 == p5:
+                        p1, p2 = p2, p1
+                    elif p2 == p6:
+                        p1, p2, p5, p6 = p2, p1, p6, p5
+                    else:
+                        continue
+
+                    if p3 == p7:
+                        pass
+                    elif p3 == p8:
+                        p7, p8 = p8, p7
+                    elif p4 == p7:
+                        p3, p4 = p4, p3
+                    elif p4 == p8:
+                        p3, p4, p7, p8 = p4, p3, p8, p7
+                    else:
+                        continue
+
+                    cong3_exists, cong3 = self.is_cong(p2, p6, p4, p8)
+                    if cong3_exists:
+                        parents = [congruences[i], congruences[j]]
+                        if cong3:
+                            parents.append(cong3)
+
+                        if self.is_sameclock(p1, p2, p6, p3, p4, p8):
+                            new_relations.append(CongruentTriangle1(
+                                p1, p2, p6, p3, p4, p8,
+                                parents=parents,
+                                rule="congABDE_congBCEF_congCAFD_sameclockABCDEF__contri1ABCDEF"
+                            ))
+                        else:
+                            new_relations.append(CongruentTriangle2(
+                                p1, p2, p6, p3, p4, p8,
+                                parents=parents,
+                                rule="congABDE_congBCEF_congCAFD_sameclockABCFED__contri2ABCDEF"
+                            ))
+
+                p5, p6, p7, p8 = p7, p8, p5, p6
+                if len({p1, p2, p5, p6}) == 3 and len({p3, p4, p7, p8}) == 3:
+                    if p1 == p5:
+                        pass
+                    elif p1 == p6:
+                        p5, p6 = p6, p5
+                    elif p2 == p5:
+                        p1, p2 = p2, p1
+                    elif p2 == p6:
+                        p1, p2, p5, p6 = p2, p1, p6, p5
+                    else:
+                        continue
+
+                    if p3 == p7:
+                        pass
+                    elif p3 == p8:
+                        p7, p8 = p8, p7
+                    elif p4 == p7:
+                        p3, p4 = p4, p3
+                    elif p4 == p8:
+                        p3, p4, p7, p8 = p4, p3, p8, p7
+                    else:
+                        continue
+
+                    cong3_exists, cong3 = self.is_cong(p2, p6, p4, p8)
+                    if cong3_exists:
+                        parents = [congruences[i], congruences[j]]
+                        if cong3:
+                            parents.append(cong3)
+                        
+                        if self.is_sameclock(p1, p2, p6, p3, p4, p8):
+                            new_relations.append(CongruentTriangle1(
+                                p1, p2, p6, p3, p4, p8,
+                                parents=parents,
+                                rule="congABDE_congBCEF_congCAFD_sameclockABCDEF__contri1ABCDEF"
+                            ))
+                        else:
+                            new_relations.append(CongruentTriangle2(
+                                p1, p2, p6, p3, p4, p8,
+                                parents=parents,
+                                rule="congABDE_congBCEF_congCAFD_sameclockABCFED__contri2ABCDEF"
+                            ))
+
+        return new_relations
+
     # Rule: triangle similarity AA
     def eqangleABCDEF_eqangleCABFDE_sameclockABCDEF__simtri1ABCDEF(self) -> List[RelationNode]:
         new_relations = []
@@ -614,7 +714,129 @@ class DeductiveDatabase:
 
         return new_relations
 
+    def congOAOB_congOAOC_congOAOD__cyclicABCD(self) -> List[RelationNode]:
+        new_relations = []
+        congruences = self.problem.relations.get("cong", [])
+        for i in range(len(congruences)):
+            cong1 = congruences[i]
+            p1, p2, p3, p4 = cong1.points
+            if p1 == p4:
+                p3, p4 = p4, p3
+            elif p2 == p3:
+                p1, p2 = p2, p1
+            elif p2 == p4:
+                p1, p2, p3, p4 = p2, p1, p4, p3
+            elif p1 == p3:
+                pass
+            else:
+                continue
 
+            seg1 = frozenset({p1, p2})
+            congruent_segs = []
+            for j in range(len(congruences)):
+                if i == j:
+                    continue
+                p5, p6, p7, p8 = congruences[j].points
+                if frozenset({p5, p6}) == seg1:
+                    if p1 == p8:
+                        p7, p8 = p8, p7
+                    elif p1 == p7:
+                        pass
+                    else:
+                        continue
+                    congruent_segs.append(((p7, p8), congruences[j]))
+                elif frozenset({p7, p8}) == seg1:
+                    if p1 == p6:
+                        p5, p6 = p6, p5
+                    elif p1 == p5:
+                        pass
+                    else:
+                        continue
+                    congruent_segs.append(((p5, p6), congruences[j]))
+                
+            for j in range(len(congruent_segs)):
+                for k in range(j + 1, len(congruent_segs)):
+                    (p5, p6), cong2 = congruent_segs[j]
+                    (p7, p8), cong3 = congruent_segs[k]
+                    if len({p2, p4, p6, p8}) != 4:
+                        continue
+
+                    new_relations.append(Cyclic(
+                        p2, p4, p6, p8,
+                        parents=[cong1, cong2, cong3],
+                        rule="congOAOB_congOAOC_congOAOD__cyclicABCD"
+                    ))
+
+            p1, p2, p3, p4 = p3, p4, p1, p2
+            seg1 = frozenset({p1, p2})
+            congruent_segs = []
+            for j in range(len(congruences)):
+                if i == j:
+                    continue
+                p5, p6, p7, p8 = congruences[j].points
+                if frozenset({p5, p6}) == seg1:
+                    if p1 == p8:
+                        p7, p8 = p8, p7
+                    elif p1 == p7:
+                        pass
+                    else:
+                        continue
+                    congruent_segs.append(((p7, p8), congruences[j]))
+                elif frozenset({p7, p8}) == seg1:
+                    if p1 == p6:
+                        p5, p6 = p6, p5
+                    elif p1 == p5:
+                        pass
+                    else:
+                        continue
+                    congruent_segs.append(((p5, p6), congruences[j]))
+                
+            for j in range(len(congruent_segs)):
+                for k in range(j + 1, len(congruent_segs)):
+                    (p5, p6), cong2 = congruent_segs[j]
+                    (p7, p8), cong3 = congruent_segs[k]
+                    if len({p2, p4, p6, p8}) != 4:
+                        continue
+
+                    new_relations.append(Cyclic(
+                        p2, p4, p6, p8,
+                        parents=[cong1, cong2, cong3],
+                        rule="congOAOB_congOAOC_congOAOD__cyclicABCD"
+                    ))
+            
+        return new_relations
+                           
+    def midpMAB_midpNAC__paraMNBC(self) -> List[RelationNode]:
+        new_relations = []
+        midpoints = self.problem.relations.get("midp", [])
+        for i in range(len(midpoints)):
+            for j in range(i + 1, len(midpoints)):
+                midp1 = midpoints[i]
+                midp2 = midpoints[j]
+                p1, p2, p3 = midp1.points
+                p4, p5, p6 = midp2.points
+                if p2 == p5:
+                    pass
+                elif p2 == p6:
+                    p5, p6 = p6, p5
+                elif p3 == p5:
+                    p2, p3 = p3, p2
+                elif p3 == p6:
+                    p2, p3, p5, p6 = p3, p2, p6, p5
+                else:
+                    continue
+
+                if p1 == p4 or p3 == p6:
+                    continue
+
+                new_relations.append(Parallel(
+                    p1, p4, p3, p6,
+                    parents=[midp1, midp2],
+                    rule="midpMAB_midpNAC__paraMNBC"
+                ))
+
+        return new_relations
+    
     """
     Helper methods for specific rules starts here.
     """

@@ -1,5 +1,5 @@
 from relations import *
-from problem import *
+from Problem import *
 
 def construct_problem():
     # Define Points

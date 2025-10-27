@@ -153,11 +153,7 @@ class Collinear(RelationNode):
             relation=frozenset({p1, p2, p3}),
             representation=f"col {p1} {p2} {p3}",
             parents=parents,
-            rule=rule,
-            # equivalent=[
-            #     Parallel(p1, p2, p1, p3, parents=[self]),
-            #     Parallel(p1, p2, p2, p3, parents=[self])
-            # ],
+            rule=rule
         )
 
         self.points = [p1, p2, p3]
@@ -174,7 +170,13 @@ class Cyclic(RelationNode):
             relation=frozenset({p1, p2, p3, p4}),
             representation=f"cyclic {p1} {p2} {p3} {p4}",
             parents=parents,
-            rule=rule
+            rule=rule,
+            equivalent=[
+                EqualAngle(p1, p2, p3, p1, p4, p3, parents=[self]),
+                EqualAngle(p2, p3, p4, p2, p1, p4, parents=[self]),
+                EqualAngle(p1, p2, p4, p1, p3, p4, parents=[self]),
+                EqualAngle(p2, p1, p3, p2, p4, p3, parents=[self])
+            ]
         )
 
         self.points = [p1, p2, p3, p4]
@@ -293,10 +295,10 @@ class CongruentTriangle2(RelationNode):
             equivalent=[
                 Congruent(p1, p2, p4, p5, parents=[self]),
                 Congruent(p2, p3, p5, p6, parents=[self]),
-                Congruent(p3, p1, p6, p5, parents=[self]),
+                Congruent(p3, p1, p6, p4, parents=[self]),
                 EqualAngle(p1, p2, p3, p6, p5, p4, parents=[self]),
                 EqualAngle(p2, p3, p1, p4, p6, p5, parents=[self]),
-                EqualAngle(p3, p1, p2, p6, p4, p5, parents=[self]),
+                EqualAngle(p3, p1, p2, p5, p4, p6, parents=[self]),
                 # Sameclock(p1, p2, p3, p6, p5, p4, parents=[self])
             ]
         )
@@ -324,6 +326,7 @@ class Midpoint(RelationNode):
 
         self.points = [mid, p1, p2]
 
+
 class EqualRatio(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  p5: Point, p6: Point, p7: Point, p8: Point,
@@ -341,6 +344,28 @@ class EqualRatio(RelationNode):
         )
 
         self.points = [p1, p2, p3, p4, p5, p6, p7, p8]
+
+
+class Circle(RelationNode):
+    def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[List[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="circle",
+            index=index,
+            relation=(p1, frozenset({p2, p3, p4})),
+            representation=f"circle {p1} {p2} {p3} {p4}",
+            parents=parents,
+            rule=rule,
+            equivalent=[
+                Congruent(p1, p2, p1, p3, parents=[self]),
+                Congruent(p1, p2, p1, p4, parents=[self]),
+                Congruent(p1, p3, p1, p4, parents=[self])
+            ]
+        )
+
+        self.points = [p1, p2, p3, p4]
 
 
 if __name__ == "__main__":

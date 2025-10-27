@@ -1,1 +1,1 @@
-cong O A O B; cong O A O C; perp O B B D; eqangle A O C C O B; ? eqangle A B C C B D
+circle O A B C; perp O B B D; eqangle A O C C O B; ? eqangle A B C C B D

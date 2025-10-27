@@ -2,7 +2,7 @@
 from relations import *
 
 RELATION_TYPES = ["cong", "eqangle", "para", "perp", "col", "cyclic", "eqratio",
-                  "simtri1", "simtri2", "contri1", "contri2", "midp"]
+                  "simtri1", "simtri2", "contri1", "contri2", "midp", "circle"]
 
 class Problem:
     def __init__(self, name: str, points: List[Point],
@@ -12,9 +12,11 @@ class Problem:
         self.points = points
         self.assumptions = assumptions if assumptions is not None else []
         self.goals = goals if goals is not None else []
+        self.remaining_goals = goals.copy() if goals is not None else []
         self.solved = False
         self.relations = {r : [] for r in RELATION_TYPES}
         self.index_counter = 1
+        self.deduction_steps = []
         for r in self.assumptions:
             r.add_index(self.index_counter)
             self.index_counter += 1
@@ -35,11 +37,20 @@ class Problem:
         relations_str += "".join(f"{r}\n" for r in sorted(relation_list, key=lambda r: r.index))
         goals_str = "Goals (solved):\n" if self.solved else "Goals (unsolved):\n"
         goals_str += "".join(f"{g.representation}\n" for g in self.goals)
-        return f"Problem {self.name}:\n{points_str}\n{assumptions_str}{relations_str}{goals_str}"
+        procedure_str = ""
+        if self.solved:
+            procedure_str = self.trace_back()
 
+        # test_output prints all known relations
+        test_output = f"Problem {self.name}:\n{points_str}\n{assumptions_str}{relations_str}{goals_str}{procedure_str}"
+
+        # normal_output only prints deduction steps involved in the proof
+        normal_output = f"Problem {self.name}:\n{points_str}\n{assumptions_str}{goals_str}{procedure_str}"
+        return test_output
+    
     def is_solved(self):
         return self.solved
-    
+
     def add_relation(self, relation: RelationNode) -> Optional[List[RelationNode]]:
         new_relations = []
         if not relation.name in RELATION_TYPES:
@@ -65,10 +76,11 @@ class Problem:
                 if new_rel:
                     new_relations.extend(new_rel)
 
-        for goal in self.goals:
+        for goal in self.remaining_goals:
             if goal.relation == relation.relation:
-                self.goals.remove(goal)
-                if not self.goals:
+                self.remaining_goals.remove(goal)
+                self.deduction_steps.append(relation)
+                if not self.remaining_goals:
                     self.solved = True
                 break
 
@@ -84,4 +96,32 @@ class Problem:
         elif relation.name == "contri1" or relation.name == "contri2":
             p1, p2, p3, p4, p5, p6 = relation.points
             return (p1, p2, p3) == (p4, p5, p6)
+        elif relation.name == "simtri1" or relation.name == "simtri2":
+            p1, p2, p3, p4, p5, p6 = relation.points
+            return (p1, p2, p3) == (p4, p5, p6) or \
+                   any(relation.relation == contri.relation for contri in self.relations["contri1"] + self.relations["contri2"])
         return False
+    
+    def trace_back(self) -> str:
+        if not self.solved:
+            return ""
+        
+        next_steps = self.deduction_steps.copy()
+        while next_steps:
+            step = next_steps.pop(0)
+            for parent in step.parents:
+                if parent not in next_steps:
+                    next_steps.append(parent)
+            
+            if step not in self.deduction_steps:
+                self.deduction_steps.append(step)
+
+        steps_str = "Deduction Steps (in order of discovery):\n"
+        step_cnt = 1
+        for step in sorted(self.deduction_steps, key=lambda r: r.index):
+            # reassign indices to output only the steps used in the proof
+            step.add_index(step_cnt)
+            step_cnt += 1
+            steps_str += f"{step}\n"
+
+        return steps_str

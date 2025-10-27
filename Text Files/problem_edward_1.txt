@@ -1,0 +1,1 @@
+cyclic A B C D; para A D B C; col B E D; col A E C; ? cong B E C E

@@ -1,1 +1,0 @@
-midp F A B;midp E B C;col A G D;col B D C;col B G E;col C G F;?midp G E F

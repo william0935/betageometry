@@ -1,14 +1,14 @@
 ## Solve problems using deductive database
 
-from read_in_relations import *
-from read_in_geogebra import *
-from constructions import *
+from Read_in_Relations import *
+from Read_in_Geogebra_File import *
+from Constructions import *
 from dd import *
 from dd_ar import *
-from problem import *
+from Problem import *
 from matplotlib import pyplot as plt
 
-problem_name = "test2"
+problem_name = "problem1"
 
 # parse info from .ggb through Read_in_Geogebra_File.py
 points_dict, lines, circles = parse_picture(f"{problem_name}.ggb")
@@ -18,7 +18,7 @@ fig, ax = setup_geometry_plot()
 plot_points(ax, points_dict)
 plot_lines_from_eq(ax, lines)
 plot_circles_from_eq(ax, circles)
-plt.show()
+
 
 # create starting points
 points = []
@@ -37,3 +37,5 @@ solver = DDWithAR(problem)
 # solver = DeductiveDatabase(problem)
 solver.apply_deduction_rules(50)
 print(solver.problem)
+
+plt.show()

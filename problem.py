@@ -95,10 +95,10 @@ class Problem:
             return (frozenset({p1, p2}), frozenset({p2, p3})) == (frozenset({p4, p5}), frozenset({p5, p6}))
         elif relation.name == "contri1" or relation.name == "contri2":
             p1, p2, p3, p4, p5, p6 = relation.points
-            return (p1, p2, p3) == (p4, p5, p6)
+            return set((p1, p2, p3)) == set((p4, p5, p6))
         elif relation.name == "simtri1" or relation.name == "simtri2":
             p1, p2, p3, p4, p5, p6 = relation.points
-            return (p1, p2, p3) == (p4, p5, p6) or \
+            return set((p1, p2, p3)) == set((p4, p5, p6)) or \
                    any(relation.relation == contri.relation for contri in self.relations["contri1"] + self.relations["contri2"])
         return False
     

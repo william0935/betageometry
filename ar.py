@@ -39,89 +39,47 @@ class Table:
     #     return residual <= tol
     
     def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, List[RelationNode]]:
-        """Check if a row is in the span of existing rows using Gaussian elimination without division.
-        
-        Returns:
-            Tuple[bool, List[RelationNode]]: (is_spanned, list of relation keys whose rows were used)
-        """
+        """Check if `row` is in the rowspan of existing rows, and identify which relations were used."""
         if not self.rows:
             return False, []
-        
-        # Collect all rows and track which relation each row belongs to
+
+        # Flatten all existing rows and track which relation they come from
         all_rows = []
-        row_to_relation = []  # Maps each row index to its relation key
+        row_to_relation = []
         for relation_key, row_list in self.rows.items():
             for r in row_list:
-                all_rows.append(r)
+                all_rows.append(np.asarray(r, dtype=float))
                 row_to_relation.append(relation_key)
-        
-        r = np.asarray(row, dtype=int)
-        R = np.vstack([np.asarray(existing_row, dtype=int) for existing_row in all_rows])
-        augmented = np.vstack([R, r])
-        n_rows, n_cols = augmented.shape
-        
-        # Track which rows participated in eliminating the last row
-        # A row "participates" if it was used as a pivot or interacted with the last row
-        used_row_indices = set()
-        
-        pivot_row = 0
-        for col in range(n_cols):
-            found_pivot = False
-            pivot_row_idx = None
-            for row_idx in range(pivot_row, n_rows):
-                if augmented[row_idx, col] != 0:
-                    # Swap rows if needed
-                    if row_idx != pivot_row:
-                        augmented[[pivot_row, row_idx]] = augmented[[row_idx, pivot_row]]
-                        # Also swap in the tracking list
-                        if pivot_row < len(row_to_relation) and row_idx < len(row_to_relation):
-                            row_to_relation[pivot_row], row_to_relation[row_idx] = row_to_relation[row_idx], row_to_relation[pivot_row]
-                    found_pivot = True
-                    pivot_row_idx = pivot_row
-                    break
-            
-            if not found_pivot:
-                continue
-            
-            # Eliminate all other rows using this pivot (no division)
-            pivot_val = augmented[pivot_row, col]
-            last_row_idx = n_rows - 1
-            
-            for row_idx in range(n_rows):
-                if row_idx == pivot_row:
-                    continue
-                if augmented[row_idx, col] == 0:
-                    continue
-                
-                # If we're eliminating the last row (the test row), record which pivot was used
-                if row_idx == last_row_idx and pivot_row < len(row_to_relation):
-                    used_row_indices.add(pivot_row)
-                
-                # Eliminate: row = row * pivot_val - augmented[row, col] * pivot_row
-                row_multiplier = augmented[row_idx, col]
-                augmented[row_idx] = augmented[row_idx] * pivot_val - row_multiplier * augmented[pivot_row]
-            
-            pivot_row += 1
-            if pivot_row >= n_rows - 1:
-                break
-        
-        # Check if the last row (which was r) became all zeros
-        last_row = augmented[-1]
-        is_spanned_result = np.allclose(last_row, 0, atol=tol)
-        
-        # Collect the relation keys that were used
-        used_relations = []
-        if is_spanned_result:
-            seen_relation_ids = set()
-            for row_idx in sorted(used_row_indices):
-                if row_idx < len(row_to_relation):
-                    relation = row_to_relation[row_idx]
-                    relation_id = id(relation)
-                    if relation_id not in seen_relation_ids:
-                        seen_relation_ids.add(relation_id)
-                        used_relations.append(relation)
-        
-        return is_spanned_result, used_relations
+
+        R = np.vstack(all_rows)
+        r = np.asarray(row, dtype=float)
+
+        # --- Check if r is in rowspan(R) ---
+        rank_R = np.linalg.matrix_rank(R, tol=tol)
+        rank_aug = np.linalg.matrix_rank(np.vstack([R, r]), tol=tol)
+        is_spanned = (rank_R == rank_aug)
+
+        if not is_spanned:
+            return False, []
+
+        # --- Find which rows are needed ---
+        # Compute a reduced row echelon form (numerically via QR decomposition)
+        # The pivot rows correspond to linearly independent rows.
+        Q, R_upper = np.linalg.qr(R.T)  # work with column space of R.T to find row independence
+        independent_rows = np.abs(np.diag(R_upper)) > tol
+        used_indices = np.where(independent_rows)[0]
+
+        # Optional: refine which ones specifically combine to form r (via least squares)
+        coeffs, residuals, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
+        nonzero = np.where(np.abs(coeffs) > tol)[0]
+
+        used_relations = [row_to_relation[i] for i in nonzero]
+
+        # Deduplicate while preserving order
+        seen = set()
+        used_relations = [r for r in used_relations if not (r in seen or seen.add(r))]
+
+        return True, used_relations
 
     def add_row(self, row: List[Any], relation: RelationNode):
         if len(row) != len(self.header):

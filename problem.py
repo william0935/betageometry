@@ -1,5 +1,8 @@
 ## Create the Problem data structure
 from relations import *
+from typing import List, Optional, Tuple
+from itertools import combinations, permutations
+import numpy as np
 
 RELATION_TYPES = ["cong", "eqangle", "para", "perp", "col", "cyclic", "eqratio",
                   "simtri1", "simtri2", "contri1", "contri2", "midp", "circle"]
@@ -17,6 +20,7 @@ class Problem:
         self.relations = {r : [] for r in RELATION_TYPES}
         self.index_counter = 1
         self.deduction_steps = []
+        self.similar_triangle_pairs = self.check_similar_triangle_pairs()
         for r in self.assumptions:
             r.add_index(self.index_counter)
             self.index_counter += 1
@@ -77,7 +81,7 @@ class Problem:
                     new_relations.extend(new_rel)
 
         for goal in self.remaining_goals:
-            if goal.relation == relation.relation:
+            if goal.name == relation.name and goal.relation == relation.relation:
                 self.remaining_goals.remove(goal)
                 self.deduction_steps.append(relation)
                 if not self.remaining_goals:
@@ -125,3 +129,32 @@ class Problem:
             steps_str += f"{step}\n"
 
         return steps_str
+
+    def check_similar_triangle_pairs(self, tol=1e-5) -> List[Tuple[Point, Point, Point, Point, Point, Point]]:
+        "check all possible similar triangle pairs among the points according to the diagram"
+        points = self.points
+        pairs = []
+        for p1, p2, p3 in combinations(points, 3):
+            for p4, p5, p6 in permutations(points, 3):
+                if p1 == p4 and p2 == p5 and p3 == p6:
+                    continue
+                if abs(self.angle_value(p1, p2, p3) - self.angle_value(p4, p5, p6)) < tol and \
+                   abs(self.angle_value(p2, p3, p1) - self.angle_value(p5, p6, p4)) < tol and \
+                   abs(self.angle_value(p3, p1, p2) - self.angle_value(p6, p4, p5)) < tol:
+                    pairs.append((p1, p2, p3, p4, p5, p6))
+        return pairs
+
+    def angle_value(self, a: Point, b: Point, c: Point) -> float:
+        "compute the angle value of angle ABC in degrees"
+        A = np.array([a.x, a.y])
+        B = np.array([b.x, b.y])
+        C = np.array([c.x, c.y])
+        BA = A - B
+        BC = C - B
+        cos_angle = np.dot(BA, BC) / (np.linalg.norm(BA) * np.linalg.norm(BC))
+        angle_rad = np.arccos(np.clip(cos_angle, -1.0, 1.0))
+        angle_deg = np.degrees(angle_rad)
+        # normalize angle degree to [0, 180]
+        if angle_deg > 180:
+            angle_deg = 360 - angle_deg
+        return angle_deg

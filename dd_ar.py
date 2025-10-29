@@ -190,245 +190,573 @@ class DDWithAR:
     def check_triangle_congruence_all_permutations(self) -> List[RelationNode]:
         """Check for triangle congruence for all permutations of triangle vertices."""
         new_relations = []
-        triangles = list(itertools.permutations(self.problem.points, 3))
-        
-        for i in range(len(triangles)):
-            for j in range(i + 1, len(triangles)):
-                p1, p2, p3 = triangles[i]
-                p4, p5, p6 = triangles[j]
+        triangles = self.problem.similar_triangle_pairs
 
-                are_collinear1, _ = self.are_points_collinear(p1, p2, p3)
-                are_collinear2, _ = self.are_points_collinear(p4, p5, p6)
-                if are_collinear1 or are_collinear2:
-                    continue
+        for (p1, p2, p3, p4, p5, p6) in triangles:
+            are_collinear1, _ = self.are_points_collinear(p1, p2, p3)
+            are_collinear2, _ = self.are_points_collinear(p4, p5, p6)
+            if are_collinear1 or are_collinear2:
+                continue
 
-                seg1_1 = frozenset({p1, p2})
-                seg1_2 = frozenset({p2, p3})
-                seg1_3 = frozenset({p1, p3})
-                seg2_1 = frozenset({p4, p5})
-                seg2_2 = frozenset({p5, p6})
-                seg2_3 = frozenset({p4, p6})
+            seg1_1 = frozenset({p1, p2})
+            seg1_2 = frozenset({p2, p3})
+            seg1_3 = frozenset({p1, p3})
+            seg2_1 = frozenset({p4, p5})
+            seg2_2 = frozenset({p5, p6})
+            seg2_3 = frozenset({p4, p6})
 
-                if self.is_sameclock(p1, p2, p3, p4, p5, p6):
-                    angle1_1 = (seg1_1, seg1_2)
-                    angle1_2 = (seg1_1, seg1_3)
-                    angle1_3 = (seg1_2, seg1_3)
-                    angle2_1 = (seg2_1, seg2_2)
-                    angle2_2 = (seg2_1, seg2_3)
-                    angle2_3 = (seg2_2, seg2_3)
+            if self.is_sameclock(p1, p2, p3, p4, p5, p6):
+                angle1_1 = (seg1_1, seg1_2)
+                angle1_2 = (seg1_1, seg1_3)
+                angle1_3 = (seg1_2, seg1_3)
+                angle2_1 = (seg2_1, seg2_2)
+                angle2_2 = (seg2_1, seg2_3)
+                angle2_3 = (seg2_2, seg2_3)
 
-                    are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
-                    are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
-                    are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
-                    are_seg_congruent1, parents_segs1 = self.are_segments_congruent(seg1_1, seg2_1)
-                    are_seg_congruent2, parents_segs2 = self.are_segments_congruent(seg1_2, seg2_2)
-                    are_seg_congruent3, parents_segs3 = self.are_segments_congruent(seg1_3, seg2_3)
+                are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
+                are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
+                are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
+                are_seg_congruent1, parents_segs1 = self.are_segments_congruent(seg1_1, seg2_1)
+                are_seg_congruent2, parents_segs2 = self.are_segments_congruent(seg1_2, seg2_2)
+                are_seg_congruent3, parents_segs3 = self.are_segments_congruent(seg1_3, seg2_3)
 
-                    if are_angles_equal1:
-                        if are_seg_congruent1 and are_seg_congruent2:
-                            new_relations.append(CongruentTriangle1(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 | parents_segs1 | parents_segs2,
-                                rule="check_triangle_congruence_SAS_sameclock"
-                            ))
-                            continue
-                    if are_angles_equal2:
-                        if are_seg_congruent1 and are_seg_congruent3:
-                            new_relations.append(CongruentTriangle1(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 | parents_segs1 | parents_segs3,
-                                rule="check_triangle_congruence_SAS_sameclock"
-                            ))
-                            continue
-                    if are_angles_equal3:
-                        if are_seg_congruent2 and are_seg_congruent3:
-                            new_relations.append(CongruentTriangle1(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 | parents_segs2 | parents_segs3,
-                                rule="check_triangle_congruence_SAS_sameclock"
-                            ))
-                            continue
-                    if are_seg_congruent1 and are_seg_congruent2 and are_seg_congruent3:
+                if are_angles_equal1:
+                    if are_seg_congruent1 and are_seg_congruent2:
                         new_relations.append(CongruentTriangle1(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_segs1 | parents_segs2 | parents_segs3,
-                            rule="check_triangle_congruence_SSS_sameclock"
+                            parents=parents_angles1 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_SAS_sameclock"
                         ))
-                else:
-                    angle1_1 = (seg1_1, seg1_2)
-                    angle1_2 = (seg1_1, seg1_3)
-                    angle1_3 = (seg1_2, seg1_3)
-                    angle2_1 = (seg2_2, seg2_1)
-                    angle2_2 = (seg2_3, seg2_1)
-                    angle2_3 = (seg2_3, seg2_2)
+                        continue
+                    if are_angles_equal2 and are_seg_congruent1:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_angles2 | parents_segs1,
+                            rule="check_triangle_congruence_AAS_sameclock"
+                        ))
+                        continue
+                    if are_angles_equal2 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_angles2 | parents_segs2,
+                            rule="check_triangle_congruence_AAS_sameclock"
+                        ))
+                        continue
+                    if are_angles_equal2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_angles2 | parents_segs3,
+                            rule="check_triangle_congruence_AAS_sameclock"
+                        ))
+                        continue
+                if are_angles_equal2:
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles2 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_sameclock"
+                        ))
+                        continue
+                if are_angles_equal3:
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles3 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_sameclock"
+                        ))
+                        continue
+                if are_seg_congruent1 and are_seg_congruent2 and are_seg_congruent3:
+                    new_relations.append(CongruentTriangle1(
+                        p1, p2, p3, p4, p5, p6,
+                        parents=parents_segs1 | parents_segs2 | parents_segs3,
+                        rule="check_triangle_congruence_SSS_sameclock"
+                    ))
 
-                    are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
-                    are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
-                    are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
-                    are_seg_congruent1, parents_segs1 = self.are_segments_congruent(seg1_1, seg2_1)
-                    are_seg_congruent2, parents_segs2 = self.are_segments_congruent(seg1_2, seg2_2)
-                    are_seg_congruent3, parents_segs3 = self.are_segments_congruent(seg1_3, seg2_3)
-                    
-                    if are_angles_equal1:
-                        if are_seg_congruent1 and are_seg_congruent2:
-                            new_relations.append(CongruentTriangle2(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 | parents_segs1 | parents_segs2,
-                                rule="check_triangle_congruence_SAS_opposite"
-                            ))
-                            continue
-                    if are_angles_equal2:
-                        if are_seg_congruent1 and are_seg_congruent3:
-                            new_relations.append(CongruentTriangle2(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 | parents_segs1 | parents_segs3,
-                                rule="check_triangle_congruence_SAS_opposite"
-                            ))
-                            continue
-                    if are_angles_equal3:
-                        if are_seg_congruent2 and are_seg_congruent3:
-                            new_relations.append(CongruentTriangle2(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 | parents_segs2 | parents_segs3,
-                                rule="check_triangle_congruence_SAS_opposite"
-                            ))
-                            continue
-                    if are_seg_congruent1 and are_seg_congruent2 and are_seg_congruent3:
+                are_lines_perpendicular1_12, parents_perp1_12 = self.are_lines_perpendicular(seg1_1, seg1_2)
+                are_lines_perpendicular1_23, parents_perp1_23 = self.are_lines_perpendicular(seg1_2, seg1_3)
+                are_lines_perpendicular1_13, parents_perp1_13 = self.are_lines_perpendicular(seg1_2, seg1_3)
+                are_lines_perpendicular2_12, parents_perp2_12 = self.are_lines_perpendicular(seg2_1, seg2_2)
+                are_lines_perpendicular2_13, parents_perp2_13 = self.are_lines_perpendicular(seg2_2, seg2_3)
+                are_lines_perpendicular2_23, parents_perp2_23 = self.are_lines_perpendicular(seg2_1, seg2_3)
+                if are_lines_perpendicular1_12 and are_lines_perpendicular2_12:
+                    if are_seg_congruent1 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12| parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_SAS_sameclock"
+                        ))
+                        continue
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_HL_sameclock"
+                        ))
+                        continue
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_HL_sameclock"
+                        ))
+                        continue
+                if are_lines_perpendicular1_23 and are_lines_perpendicular2_23:
+                    if are_seg_congruent1 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_HL_sameclock"
+                        ))
+                        continue
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_sameclock"
+                        ))
+                        continue
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_HL_sameclock"
+                        ))
+                        continue
+                if are_lines_perpendicular1_13 and are_lines_perpendicular2_13:
+                    if are_seg_congruent1 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_HL_sameclock"
+                        ))
+                        continue
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_HL_sameclock"
+                        ))
+                        continue
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_sameclock"
+                        ))
+                        continue
+            else:
+                angle1_1 = (seg1_1, seg1_2)
+                angle1_2 = (seg1_1, seg1_3)
+                angle1_3 = (seg1_2, seg1_3)
+                angle2_1 = (seg2_2, seg2_1)
+                angle2_2 = (seg2_3, seg2_1)
+                angle2_3 = (seg2_3, seg2_2)
+
+                are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
+                are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
+                are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
+                are_seg_congruent1, parents_segs1 = self.are_segments_congruent(seg1_1, seg2_1)
+                are_seg_congruent2, parents_segs2 = self.are_segments_congruent(seg1_2, seg2_2)
+                are_seg_congruent3, parents_segs3 = self.are_segments_congruent(seg1_3, seg2_3)
+                
+                if are_angles_equal1:
+                    if are_seg_congruent1 and are_seg_congruent2:
                         new_relations.append(CongruentTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_segs1 | parents_segs2 | parents_segs3,
-                            rule="check_triangle_congruence_SSS_opposite"
+                            parents=parents_angles1 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_SAS_opposite"
                         ))
-        
+                        continue
+                    if are_angles_equal2 and are_seg_congruent1:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_angles2 | parents_segs1,
+                            rule="check_triangle_congruence_AAS_opposite"
+                        ))
+                        continue
+                    if are_angles_equal2 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_angles2 | parents_segs2,
+                            rule="check_triangle_congruence_AAS_opposite"
+                        ))
+                        continue
+                    if are_angles_equal2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_angles2 | parents_segs3,
+                            rule="check_triangle_congruence_AAS_opposite"
+                        ))
+                        continue
+                if are_angles_equal2:
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles2 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_opposite"
+                        ))
+                        continue
+                if are_angles_equal3:
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles3 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_opposite"
+                        ))
+                        continue
+                if are_seg_congruent1 and are_seg_congruent2 and are_seg_congruent3:
+                    new_relations.append(CongruentTriangle2(
+                        p1, p2, p3, p4, p5, p6,
+                        parents=parents_segs1 | parents_segs2 | parents_segs3,
+                        rule="check_triangle_congruence_SSS_opposite"
+                    ))
+
+                are_lines_perpendicular1_12, parents_perp1_12 = self.are_lines_perpendicular(seg1_1, seg1_2)
+                are_lines_perpendicular1_23, parents_perp1_23 = self.are_lines_perpendicular(seg1_2, seg1_3)
+                are_lines_perpendicular1_13, parents_perp1_13 = self.are_lines_perpendicular(seg1_1, seg1_3)
+                are_lines_perpendicular2_12, parents_perp2_12 = self.are_lines_perpendicular(seg2_1, seg2_2)
+                are_lines_perpendicular2_23, parents_perp2_23 = self.are_lines_perpendicular(seg2_2, seg2_3)
+                are_lines_perpendicular2_13, parents_perp2_13 = self.are_lines_perpendicular(seg2_1, seg2_3)
+                if are_lines_perpendicular1_12 and are_lines_perpendicular2_12:
+                    if are_seg_congruent1 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_SAS_opposite"
+                        ))
+                        continue
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_HL_opposite"
+                        ))
+                        continue
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_HL_opposite"
+                        ))
+                        continue
+                if are_lines_perpendicular1_23 and are_lines_perpendicular2_23:
+                    if are_seg_congruent1 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_HL_opposite"
+                        ))
+                        continue
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_opposite"
+                        ))
+                        continue
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_HL_opposite"
+                        ))
+                        continue
+                if are_lines_perpendicular1_13 and are_lines_perpendicular2_13:
+                    if are_seg_congruent1 and are_seg_congruent2:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_segs1 | parents_segs2,
+                            rule="check_triangle_congruence_HL_opposite"
+                        ))
+                        continue
+                    if are_seg_congruent2 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_segs2 | parents_segs3,
+                            rule="check_triangle_congruence_HL_opposite"
+                        ))
+                        continue
+                    if are_seg_congruent1 and are_seg_congruent3:
+                        new_relations.append(CongruentTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_segs1 | parents_segs3,
+                            rule="check_triangle_congruence_SAS_opposite"
+                        ))
+                        continue
+
+
         return new_relations
 
     def check_triangle_similarity_all_permutations(self) -> List[RelationNode]:
         """Check for triangle similarity for all permutations of triangle vertices."""
         new_relations = []
-        triangles = list(itertools.permutations(self.problem.points, 3))
+        triangles_pairs = self.problem.similar_triangle_pairs
 
-        for i in range(len(triangles)):
-            for j in range(i + 1, len(triangles)):
-                p1, p2, p3 = triangles[i]
-                p4, p5, p6 = triangles[j]
+        for (p1, p2, p3, p4, p5, p6) in triangles_pairs:
+            are_collinear1, _ = self.are_points_collinear(p1, p2, p3)
+            are_collinear2, _ = self.are_points_collinear(p4, p5, p6)
+            if are_collinear1 or are_collinear2:
+                continue
 
-                are_collinear1, _ = self.are_points_collinear(p1, p2, p3)
-                are_collinear2, _ = self.are_points_collinear(p4, p5, p6)
-                if are_collinear1 or are_collinear2:
+            seg1_1 = frozenset({p1, p2})
+            seg1_2 = frozenset({p2, p3})
+            seg1_3 = frozenset({p1, p3})
+            seg2_1 = frozenset({p4, p5})
+            seg2_2 = frozenset({p5, p6})
+            seg2_3 = frozenset({p4, p6})
+
+            if self.is_sameclock(p1, p2, p3, p4, p5, p6):
+                angle1_1 = (seg1_1, seg1_2)
+                angle1_2 = (seg1_1, seg1_3)
+                angle1_3 = (seg1_2, seg1_3)
+                angle2_1 = (seg2_1, seg2_2)
+                angle2_2 = (seg2_1, seg2_3)
+                angle2_3 = (seg2_2, seg2_3)
+
+                are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
+                are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
+                are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
+                are_equal_ratio1, parents_ratio1 = self.are_equal_ratio(seg1_1, seg1_2, seg2_1, seg2_2)
+                are_equal_ratio2, parents_ratio2 = self.are_equal_ratio(seg1_1, seg1_3, seg2_1, seg2_3)
+                are_equal_ratio3, parents_ratio3 = self.are_equal_ratio(seg1_2, seg1_3, seg2_2, seg2_3)
+
+                if are_angles_equal1 and are_angles_equal2:
+                    new_relations.append(SimilarTriangle1(
+                        p1, p2, p3, p4, p5, p6,
+                        parents=parents_angles1 | parents_angles2,
+                        rule="check_triangle_similarity_AA_sameclock"
+                    ))
+                    continue
+                if are_angles_equal1:
+                    if are_equal_ratio1:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles1 | parents_ratio1,
+                            rule="check_triangle_similarity_SAS_sameclock"
+                        ))
+                        continue
+                if are_angles_equal2:
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles2 | parents_ratio2,
+                            rule="check_triangle_similarity_SAS_sameclock"
+                        ))
+                        continue
+                if are_angles_equal3:
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles3 | parents_ratio3,
+                            rule="check_triangle_similarity_SAS_sameclock"
+                        ))
+                        continue
+                if are_equal_ratio1 and are_equal_ratio2:
+                    new_relations.append(SimilarTriangle1(
+                        p1, p2, p3, p4, p5, p6,
+                        parents=parents_ratio1 | parents_ratio2,
+                        rule="check_triangle_similarity_SSS_sameclock"
+                    ))
                     continue
 
-                seg1_1 = frozenset({p1, p2})
-                seg1_2 = frozenset({p2, p3})
-                seg1_3 = frozenset({p1, p3})
-                seg2_1 = frozenset({p4, p5})
-                seg2_2 = frozenset({p5, p6})
-                seg2_3 = frozenset({p4, p6})
-
-                if self.is_sameclock(p1, p2, p3, p4, p5, p6):
-                    angle1_1 = (seg1_1, seg1_2)
-                    angle1_2 = (seg1_1, seg1_3)
-                    angle1_3 = (seg1_2, seg1_3)
-                    angle2_1 = (seg2_1, seg2_2)
-                    angle2_2 = (seg2_1, seg2_3)
-                    angle2_3 = (seg2_2, seg2_3)
-
-                    are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
-                    are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
-                    are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
-                    are_equal_ratio1, parents_ratio1 = self.are_equal_ratio(seg1_1, seg1_2, seg2_1, seg2_2)
-                    are_equal_ratio2, parents_ratio2 = self.are_equal_ratio(seg1_1, seg1_3, seg2_1, seg2_3)
-                    are_equal_ratio3, parents_ratio3 = self.are_equal_ratio(seg1_2, seg1_3, seg2_2, seg2_3)
-
-                    if are_angles_equal1 and are_angles_equal2:
+                are_lines_perpendicular1_12, parents_perp1_12 = self.are_lines_perpendicular(seg1_1, seg1_2)
+                are_lines_perpendicular1_23, parents_perp1_23 = self.are_lines_perpendicular(seg1_2, seg1_3)
+                are_lines_perpendicular1_13, parents_perp1_13 = self.are_lines_perpendicular(seg1_1, seg1_3)
+                are_lines_perpendicular2_12, parents_perp2_12 = self.are_lines_perpendicular(seg2_1, seg2_2)
+                are_lines_perpendicular2_23, parents_perp2_23 = self.are_lines_perpendicular(seg2_2, seg2_3)
+                are_lines_perpendicular2_13, parents_perp2_13 = self.are_lines_perpendicular(seg2_1, seg2_3)
+                if are_lines_perpendicular1_12 and are_lines_perpendicular2_12:
+                    if are_equal_ratio1:
                         new_relations.append(SimilarTriangle1(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_angles1 | parents_angles2,
-                            rule="check_triangle_similarity_AA_sameclock"
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_ratio1,
+                            rule="check_triangle_similarity_SAS_sameclock"
                         ))
                         continue
-                    if are_angles_equal1:
-                        if are_equal_ratio1:
-                            new_relations.append(SimilarTriangle1(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 | parents_ratio1,
-                                rule="check_triangle_similarity_SAS_sameclock"
-                            ))
-                            continue
-                    if are_angles_equal2:
-                        if are_equal_ratio2:
-                            new_relations.append(SimilarTriangle1(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 | parents_ratio2,
-                                rule="check_triangle_similarity_SAS_sameclock"
-                            ))
-                            continue
-                    if are_angles_equal3:
-                        if are_equal_ratio3:
-                            new_relations.append(SimilarTriangle1(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 | parents_ratio3,
-                                rule="check_triangle_similarity_SAS_sameclock"
-                            ))
-                            continue
-                    if are_equal_ratio1 and are_equal_ratio2:
+                    if are_equal_ratio2:
                         new_relations.append(SimilarTriangle1(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_ratio1 | parents_ratio2,
-                            rule="check_triangle_similarity_SSS_sameclock"
-                        ))
-                else:
-                    angle1_1 = (seg1_1, seg1_2)
-                    angle1_2 = (seg1_1, seg1_3)
-                    angle1_3 = (seg1_2, seg1_3)
-                    angle2_1 = (seg2_2, seg2_1)
-                    angle2_2 = (seg2_3, seg2_1)
-                    angle2_3 = (seg2_3, seg2_2)
-
-                    are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
-                    are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
-                    are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
-                    are_equal_ratio1, parents_ratio1 = self.are_equal_ratio(seg1_1, seg1_2, seg2_1, seg2_2)
-                    are_equal_ratio2, parents_ratio2 = self.are_equal_ratio(seg1_1, seg1_3, seg2_1, seg2_3)
-                    are_equal_ratio3, parents_ratio3 = self.are_equal_ratio(seg1_2, seg1_3, seg2_2, seg2_3)
-    
-                    if are_angles_equal1 and are_angles_equal2:
-                        new_relations.append(SimilarTriangle2(
-                            p1, p2, p3, p4, p5, p6,
-                            parents=parents_angles1 | parents_angles2,
-                            rule="check_triangle_similarity_AA_opposite"
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_ratio2,
+                            rule="check_triangle_similarity_HL_sameclock"
                         ))
                         continue
-                    if are_angles_equal1:
-                        if are_equal_ratio1:
-                            new_relations.append(SimilarTriangle2(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 | parents_ratio1,
-                                rule="check_triangle_similarity_SAS_opposite"
-                            ))
-                            continue
-                    if are_angles_equal2:
-                        if are_equal_ratio2:
-                            new_relations.append(SimilarTriangle2(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 | parents_ratio2,
-                                rule="check_triangle_similarity_SAS_opposite"
-                            ))
-                            continue
-                    if are_angles_equal3:
-                        if are_equal_ratio3:
-                            new_relations.append(SimilarTriangle2(
-                                p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 | parents_ratio3,
-                                rule="check_triangle_similarity_SAS_opposite"
-                            ))
-                            continue
-                    if are_equal_ratio1 and are_equal_ratio2:
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_ratio3,
+                            rule="check_triangle_similarity_HL_sameclock"
+                        ))
+                        continue
+                if are_lines_perpendicular1_13 and are_lines_perpendicular2_13:
+                    if are_equal_ratio1:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio1,
+                            rule="check_triangle_similarity_HL_sameclock"
+                        ))
+                        continue
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio2,
+                            rule="check_triangle_similarity_SAS_sameclock"
+                        ))
+                        continue
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio3,
+                            rule="check_triangle_similarity_HL_sameclock"
+                        ))
+                        continue
+                if are_lines_perpendicular1_23 and are_lines_perpendicular2_23:
+                    if are_equal_ratio1:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio1,
+                            rule="check_triangle_similarity_HL_sameclock"
+                        ))
+                        continue
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio2,
+                            rule="check_triangle_similarity_HL_sameclock"
+                        ))
+                        continue
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle1(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio3,
+                            rule="check_triangle_similarity_SAS_sameclock"
+                        ))
+                        continue
+            else:
+                angle1_1 = (seg1_1, seg1_2)
+                angle1_2 = (seg1_1, seg1_3)
+                angle1_3 = (seg1_2, seg1_3)
+                angle2_1 = (seg2_2, seg2_1)
+                angle2_2 = (seg2_3, seg2_1)
+                angle2_3 = (seg2_3, seg2_2)
+
+                are_angles_equal1, parents_angles1 = self.are_angles_equal(angle1_1, angle2_1)
+                are_angles_equal2, parents_angles2 = self.are_angles_equal(angle1_2, angle2_2)
+                are_angles_equal3, parents_angles3 = self.are_angles_equal(angle1_3, angle2_3)
+                are_equal_ratio1, parents_ratio1 = self.are_equal_ratio(seg1_1, seg1_2, seg2_1, seg2_2)
+                are_equal_ratio2, parents_ratio2 = self.are_equal_ratio(seg1_1, seg1_3, seg2_1, seg2_3)
+                are_equal_ratio3, parents_ratio3 = self.are_equal_ratio(seg1_2, seg1_3, seg2_2, seg2_3)
+
+                if are_angles_equal1 and are_angles_equal2:
+                    new_relations.append(SimilarTriangle2(
+                        p1, p2, p3, p4, p5, p6,
+                        parents=parents_angles1 | parents_angles2,
+                        rule="check_triangle_similarity_AA_opposite"
+                    ))
+                    continue
+                if are_angles_equal1:
+                    if are_equal_ratio1:
                         new_relations.append(SimilarTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_ratio1 | parents_ratio2,
-                            rule="check_triangle_similarity_SSS_opposite"
+                            parents=parents_angles1 | parents_ratio1,
+                            rule="check_triangle_similarity_SAS_opposite"
                         ))
-
+                        continue
+                if are_angles_equal2:
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles2 | parents_ratio2,
+                            rule="check_triangle_similarity_SAS_opposite"
+                        ))
+                        continue
+                if are_angles_equal3:
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_angles3 | parents_ratio3,
+                            rule="check_triangle_similarity_SAS_opposite"
+                        ))
+                        continue
+                if are_equal_ratio1 and are_equal_ratio2:
+                    new_relations.append(SimilarTriangle2(
+                        p1, p2, p3, p4, p5, p6,
+                        parents=parents_ratio1 | parents_ratio2,
+                        rule="check_triangle_similarity_SSS_opposite"
+                    ))
+                    continue
+                
+                are_lines_perpendicular1_12, parents_perp1_12 = self.are_lines_perpendicular(seg1_1, seg1_2)
+                are_lines_perpendicular1_23, parents_perp1_23 = self.are_lines_perpendicular(seg1_2, seg1_3)
+                are_lines_perpendicular1_13, parents_perp1_13 = self.are_lines_perpendicular(seg1_1, seg1_3)
+                are_lines_perpendicular2_12, parents_perp2_12 = self.are_lines_perpendicular(seg2_1, seg2_2)
+                are_lines_perpendicular2_23, parents_perp2_23 = self.are_lines_perpendicular(seg2_2, seg2_3)
+                are_lines_perpendicular2_13, parents_perp2_13 = self.are_lines_perpendicular(seg2_1, seg2_3)
+                if are_lines_perpendicular1_12 and are_lines_perpendicular2_12:
+                    if are_equal_ratio1:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_ratio1,
+                            rule="check_triangle_similarity_SAS_opposite"
+                        ))
+                        continue
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_ratio2,
+                            rule="check_triangle_similarity_HL_opposite"
+                        ))
+                        continue
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_12 | parents_perp2_12 | parents_ratio3,
+                            rule="check_triangle_similarity_HL_opposite"
+                        ))
+                        continue
+                if are_lines_perpendicular1_13 and are_lines_perpendicular2_13:
+                    if are_equal_ratio1:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio1,
+                            rule="check_triangle_similarity_HL_opposite"
+                        ))
+                        continue
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio2,
+                            rule="check_triangle_similarity_SAS_opposite"
+                        ))
+                        continue
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio3,
+                            rule="check_triangle_similarity_HL_opposite"
+                        ))
+                        continue
+                if are_lines_perpendicular1_23 and are_lines_perpendicular2_23:
+                    if are_equal_ratio1:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio1,
+                            rule="check_triangle_similarity_HL_opposite"
+                        ))
+                        continue
+                    if are_equal_ratio2:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio2,
+                            rule="check_triangle_similarity_HL_opposite"
+                        ))
+                        continue
+                    if are_equal_ratio3:
+                        new_relations.append(SimilarTriangle2(
+                            p1, p2, p3, p4, p5, p6,
+                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio3,
+                            rule="check_triangle_similarity_SAS_opposite"
+                        ))
+                        continue
         return new_relations
 
     def congOAOB_congOBOC__circleOABC(self) -> List[RelationNode]:
@@ -452,7 +780,7 @@ class DDWithAR:
                 if are_equal_seg1 or are_equal_seg2:
                     new_relations.append(Circle(
                         p1, p2, p4, p,
-                        parents=parents_seg1 | parents_seg2 | [cong1],
+                        parents=parents_seg1 | parents_seg2 | {cong1},
                         rule="congOAOB_congOBOC__circleOABC"
                     ))
 
@@ -478,7 +806,7 @@ class DDWithAR:
                 if are_equal_seg1 or are_equal_seg2 or are_equal_seg3:
                     new_relations.append(Cyclic(
                         p2, p3, p4, p,
-                        parents=parents1 | parents2 | parents3 | [circle],
+                        parents=parents1 | parents2 | parents3 | {circle},
                         rule="circleOABC_congOCOD__cyclicABCD"
                     ))
 
@@ -493,7 +821,7 @@ class DDWithAR:
             if p1 == p4 and p3 == p6:
                 new_relations.append(Cyclic(
                     p1, p2, p3, p5,
-                    parents=[eqangle],
+                    parents={eqangle},
                     rule="eqangleABCADC__cyclicABCD"
                 ))
 
@@ -511,7 +839,7 @@ class DDWithAR:
             if are_col_1:
                 new_relations.append(Perpendicular(
                     p2, p4, p3, p4,
-                    parents=parents1 | [circle],
+                    parents=parents1 | {circle},
                     rule="circleOABC_colOAB__perpACBC"
                 ))
             
@@ -519,7 +847,7 @@ class DDWithAR:
             if are_col_2:
                 new_relations.append(Perpendicular(
                     p2, p3, p3, p4,
-                    parents=parents2 | [circle],
+                    parents=parents2 | {circle},
                     rule="circleOABC_colOAC__perpABBC"
                 ))
 
@@ -527,7 +855,7 @@ class DDWithAR:
             if are_col_3:
                 new_relations.append(Perpendicular(
                     p2, p3, p2, p4,
-                    parents=parents3 | [circle],
+                    parents=parents3 | {circle},
                     rule="circleOABC_colOBC__perpABAC"
                 ))
 
@@ -544,25 +872,25 @@ class DDWithAR:
                 if p in {p1, p2, p3, p4}:
                     continue
 
-                are_perp_1, parents1 = self.are_points_perpendicular(p1, p2, p2, p)
-                are_perp_2, parents2 = self.are_points_perpendicular(p1, p3, p3, p)
-                are_perp_3, parents3 = self.are_points_perpendicular(p1, p4, p4, p)
+                are_perp_1, parents1 = self.are_lines_perpendicular(frozenset({p1, p2}), frozenset({p2, p}))
+                are_perp_2, parents2 = self.are_lines_perpendicular(frozenset({p1, p3}), frozenset({p3, p}))
+                are_perp_3, parents3 = self.are_lines_perpendicular(frozenset({p1, p4}), frozenset({p4, p}))
                 if are_perp_1:
                     new_relations.append(EqualAngle(
                         p, p2, p3, p2, p4, p3,
-                        parents=parents1 | [circle],
+                        parents=parents1 | {circle},
                         rule="circleOABC_perpOAAX__eqangleXABACB"
                     ))
                 if are_perp_2:
                     new_relations.append(EqualAngle(
                         p, p3, p2, p3, p4, p2,
-                        parents=parents2 | [circle],
+                        parents=parents2 | {circle},
                         rule="circleOABC_perpOAAX__eqangleXABACB"
                     ))
                 if are_perp_3:
                     new_relations.append(EqualAngle(
                         p, p4, p2, p4, p3, p2,
-                        parents=parents3 | [circle],
+                        parents=parents3 | {circle},
                         rule="circleOABC_perpOAAX__eqangleXABACB"
                     ))
 
@@ -585,19 +913,19 @@ class DDWithAR:
                 if are_eq_1:
                     new_relations.append(Perpendicular(
                         p1, p2, p2, p,
-                        parents=parents1 | [circle],
+                        parents=parents1 | {circle},
                         rule="circleOABC_eqangleXABACB__perpOAAX"
                     ))
                 if are_eq_2:
                     new_relations.append(Perpendicular(
                         p1, p3, p3, p,
-                        parents=parents2 | [circle],
+                        parents=parents2 | {circle},
                         rule="circleOABC_eqangleXABACB__perpOAAX"
                     ))
                 if are_eq_3:
                     new_relations.append(Perpendicular(
                         p1, p4, p4, p,
-                        parents=parents3 | [circle],
+                        parents=parents3 | {circle},
                         rule="circleOABC_eqangleXABACB__perpOAAX"
                     ))
 
@@ -618,11 +946,11 @@ class DDWithAR:
                 if is_midpoint:
                     new_relations.append(EqualAngle(
                         p3, p2, p4, p3, p1, p,
-                        parents=[circle],
+                        parents={circle},
                         rule="circleOABC_midpMBC__eqangleBACBOM"
                     )).append(EqualAngle(
                         p4, p2, p3, p4, p1, p,
-                        parents=[circle],
+                        parents={circle},
                         rule="circleOABC_midpMBC__eqangleCABCOM"
                     ))
                 
@@ -630,11 +958,11 @@ class DDWithAR:
                 if is_midpoint:
                     new_relations.append(EqualAngle(
                         p2, p3, p4, p2, p1, p,
-                        parents=[circle],
+                        parents={circle},
                         rule="circleOABC_midpMBC__eqangleBACBOM"
                     )).append(EqualAngle(
                         p4, p3, p2, p4, p1, p,
-                        parents=[circle],
+                        parents={circle},
                         rule="circleOABC_midpMBC__eqangleCABCOM"
                     ))
                 
@@ -642,11 +970,11 @@ class DDWithAR:
                 if is_midpoint:
                     new_relations.append(EqualAngle(
                         p2, p4, p3, p2, p1, p,
-                        parents=[circle],
+                        parents={circle},
                         rule="circleOABC_midpMBC__eqangleBACBOM"
                     )).append(EqualAngle(
                         p3, p4, p2, p3, p1, p,
-                        parents=[circle],
+                        parents={circle},
                         rule="circleOABC_midpMBC__eqangleCABCOM"
                     ))
 
@@ -672,19 +1000,19 @@ class DDWithAR:
                 if are_col_1 and are_eq_1:
                     new_relations.append(Midpoint(
                         p, p3, p4,
-                        parents=parents1 | parents_eq1 | [circle],
+                        parents=parents1 | parents_eq1 | {circle},
                         rule="circleOABC_colMBC_eqangleBACBOM__midpMBC"
                     ))
                 if are_col_2 and are_eq_2:
                     new_relations.append(Midpoint(
                         p, p2, p4,
-                        parents=parents2 | parents_eq2 | [circle],
+                        parents=parents2 | parents_eq2 | {circle},
                         rule="circleOABC_colMBC_eqangleCABCOM__midpMBC"
                     ))
                 if are_col_3 and are_eq_3:
                     new_relations.append(Midpoint(
                         p, p2, p3,
-                        parents=parents3 | parents_eq3 | [circle],
+                        parents=parents3 | parents_eq3 | {circle},
                         rule="circleOABC_colMBC_eqangleCABCOM__midpMBC"
                     ))
 
@@ -725,7 +1053,7 @@ class DDWithAR:
             if are_collinear and not are_not_collinear:
                 new_relations.append(EqualRatio(
                     p4, p2, p4, p3, p1, p2, p1, p3,
-                    parents=parents | [eqangle],
+                    parents=parents | {eqangle},
                     rule="eqangleBADDAC_colDBC__eqratioDBDCABAC"
                 ))
 
@@ -749,7 +1077,7 @@ class DDWithAR:
                 if are_seg_congruent and are_collinear:
                     new_relations.append(Congruent(
                         p1, p, p2, p,
-                        parents=parents_cong | parents_col | [perp],
+                        parents=parents_cong | parents_col | {perp},
                         rule="perpABBC_congMAMC_colMAC__congAMBM"
                     ))
 
@@ -772,7 +1100,7 @@ class DDWithAR:
                 if are_seg_congruent:
                     new_relations.append(Perpendicular(
                         p1, p2, p3, p,
-                        parents=parents_cong | [cong1],
+                        parents=parents_cong | {cong1},
                         rule="congAPBP_congAQBQ__perpABPQ"
                     ))
             
@@ -810,7 +1138,7 @@ class DDWithAR:
             return self.are_points_parallel(p1, p2, p3, p4)
         elif isinstance(rel, Perpendicular):
             p1, p2, p3, p4 = rel.points
-            return self.are_points_perpendicular(p1, p2, p3, p4)
+            return self.are_lines_perpendicular(frozenset({p1, p2}), frozenset({p3, p4}))
         else:
             return False, set()
     
@@ -890,10 +1218,13 @@ class DDWithAR:
             frozenset({p1, p3}) not in self.angle_table.col_id):
             return False, set()
 
-        gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-        gradient2 = (p3.y - p2.y) / (p3.x - p2.x)
-        if abs(gradient1 - gradient2) > 1e-6:
+        if (p2.x - p1.x == 0 and p3.x - p2.x != 0) or (p3.x - p2.x == 0 and p2.x - p1.x != 0):
             return False, set()
+        elif p2.x - p1.x != 0 and p3.x - p2.x != 0:
+            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
+            gradient2 = (p3.y - p2.y) / (p3.x - p2.x)
+            if abs(gradient1 - gradient2) > 1e-6:
+                return False, set()
 
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[frozenset({p1, p2})]] += 1
@@ -914,10 +1245,13 @@ class DDWithAR:
             frozenset({p3, p4}) not in self.angle_table.col_id):
             return False, set()
 
-        gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-        gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
-        if abs(gradient1 - gradient2) > 1e-6:
+        if (p2.x - p1.x == 0 and p4.x - p3.x != 0) or (p4.x - p3.x == 0 and p2.x - p1.x != 0):
             return False, set()
+        elif p2.x - p1.x != 0 and p4.x - p3.x != 0:
+            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
+            gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
+            if abs(gradient1 - gradient2) > 1e-6:
+                return False, set()
         
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
@@ -928,19 +1262,22 @@ class DDWithAR:
         is_spanned, parents = self.angle_table.is_spanned(row)
         return is_spanned, parents
 
-    def are_points_perpendicular(self, p1: Point, p2: Point, p3: Point, p4: Point) -> Tuple[bool, set[RelationNode]]:
-        """Check if two lines (p1,p2) and (p3,p4) are perpendicular via the AngleTable."""
-        if (frozenset({p1, p2}) not in self.angle_table.col_id or
-            frozenset({p3, p4}) not in self.angle_table.col_id):
+    def are_lines_perpendicular(self, seg1: frozenset, seg2: frozenset) -> Tuple[bool, set[RelationNode]]:
+        """Check if two lines (seg1) and (seg2) are perpendicular via the AngleTable."""
+        if (seg1 not in self.angle_table.col_id or
+            seg2 not in self.angle_table.col_id):
             return False, set()
-
-        gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-        gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
-        if abs(gradient1 * gradient2 + 1) > 1e-6:
+        
+        p1, p2 = list(seg1)
+        p3, p4 = list(seg2)
+        if (p2.x - p1.x == 0 and p4.y - p3.y != 0) or (p4.x - p3.x == 0 and p2.y - p1.y != 0):
             return False, set()
+        elif p2.x - p1.x != 0 and p4.x - p3.x != 0:
+            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
+            gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
+            if abs(gradient1 * gradient2 + 1) > 1e-6:
+                return False, set()
 
-        seg1 = frozenset({p1, p2})
-        seg2 = frozenset({p3, p4})
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[seg1]] = 1
         row1[self.angle_table.col_id[seg2]] = -1  # Perpendicularity represented differently

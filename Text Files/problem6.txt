@@ -1,0 +1,1 @@
+circle O A B C; col O C P; perp O A A P; perp O B B P; ? eqangle A O P P O B

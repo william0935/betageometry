@@ -1,0 +1,1 @@
+circle O A B C; col O A C; perp A C C E; col A D E; cyclic A B C D; para B C A E; ? eqratio B C C A A B E C

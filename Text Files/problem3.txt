@@ -1,0 +1,1 @@
+col A O B; perp A B B C; col A D C; circle O A B D; para B E A C; cong O A O E; ? simtri2 A B E C A B

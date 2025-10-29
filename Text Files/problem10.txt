@@ -1,0 +1,1 @@
+circle O B C D; perp O B B A; col A C D; ? eqratio A C A B A B A D

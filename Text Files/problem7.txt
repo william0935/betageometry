@@ -1,0 +1,1 @@
+circle O R S A; col R O S; perp R S S T; col R A T; ? eqratio R S R A R T R S

@@ -11,7 +11,7 @@ class Table:
         self.header = list(header)
         self.col_id: Dict[Any, int] = {col: i for i, col in enumerate(self.header)}
         self.rows: Dict[RelationNode, List[np.ndarray]] = {}
-        self.relations: List[RelationNode] = []  # Track all relations in order
+        self.relations: set[RelationNode] = set()  # Track all relations in order
 
     def add_col(self, col_name: Any):
         if col_name in self.col_id:
@@ -22,27 +22,54 @@ class Table:
         for relation_node, row_list in self.rows.items():
             for i in range(len(row_list)):
                 row_list[i] = np.append(row_list[i], 0)
-
-    # def is_spanned(self, row: List[Any], tol: float = 1e-10) -> bool:
-    #     if not self.rows:
-    #         return False
-    #     r = np.asarray(row, dtype=float)
-    #     # Collect all rows from all relations
-    #     all_rows = []
-    #     for row_list in self.rows.values():
-    #         all_rows.extend(row_list)
-    #     R = np.vstack(all_rows)  # shape (k, n)
-    #     # Check if r is in the row space of R: find w such that R^T w ≈ r^T
-    #     A = R.T  # shape (n, k)
-    #     w, _, _, _ = np.linalg.lstsq(A, r, rcond=None)
-    #     residual = np.linalg.norm(A @ w - r, ord=2)
-    #     return residual <= tol
     
-    def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, List[RelationNode]]:
-        """Check if `row` is in the rowspan of existing rows, and identify which relations were used."""
-        if not self.rows:
-            return False, []
+    # def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, set[RelationNode]]:
+    #     """Check if `row` is in the rowspan of existing rows, and identify which relations were used."""
+    #     if not self.rows:
+    #         return False, set()
 
+    #     # Flatten all existing rows and track which relation they come from
+    #     all_rows = []
+    #     row_to_relation = []
+    #     for relation_key, row_list in self.rows.items():
+    #         for r in row_list:
+    #             all_rows.append(np.asarray(r, dtype=float))
+    #             row_to_relation.append(relation_key)
+
+    #     R = np.vstack(all_rows)
+    #     r = np.asarray(row, dtype=float)
+
+    #     # --- Check if r is in rowspan(R) ---
+    #     rank_R = np.linalg.matrix_rank(R, tol=tol)
+    #     rank_aug = np.linalg.matrix_rank(np.vstack([R, r]), tol=tol)
+    #     is_spanned = (rank_R == rank_aug)
+
+    #     if not is_spanned:
+    #         return False, set()
+
+    #     # --- Find which rows are needed ---
+    #     # Compute a reduced row echelon form (numerically via QR decomposition)
+    #     # The pivot rows correspond to linearly independent rows.
+    #     Q, R_upper = np.linalg.qr(R.T)  # work with column space of R.T to find row independence
+    #     independent_rows = np.abs(np.diag(R_upper)) > tol
+    #     used_indices = np.where(independent_rows)[0]
+
+    #     # Optional: refine which ones specifically combine to form r (via least squares)
+    #     coeffs, residuals, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
+    #     nonzero = np.where(np.abs(coeffs) > tol)[0]
+
+    #     used_relations = [row_to_relation[i] for i in nonzero]
+
+    #     # Deduplicate while preserving order
+    #     seen = set()
+    #     used_relations = [r for r in used_relations if not (r in seen or seen.add(r))]
+
+    #     return True, used_relations
+
+    def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, set[RelationNode]]:
+        if not self.rows:
+            return False, set()
+        
         # Flatten all existing rows and track which relation they come from
         all_rows = []
         row_to_relation = []
@@ -50,35 +77,26 @@ class Table:
             for r in row_list:
                 all_rows.append(np.asarray(r, dtype=float))
                 row_to_relation.append(relation_key)
-
+        
         R = np.vstack(all_rows)
         r = np.asarray(row, dtype=float)
-
+        
         # --- Check if r is in rowspan(R) ---
         rank_R = np.linalg.matrix_rank(R, tol=tol)
         rank_aug = np.linalg.matrix_rank(np.vstack([R, r]), tol=tol)
         is_spanned = (rank_R == rank_aug)
-
+        
         if not is_spanned:
-            return False, []
-
+            return False, set()
+        
         # --- Find which rows are needed ---
-        # Compute a reduced row echelon form (numerically via QR decomposition)
-        # The pivot rows correspond to linearly independent rows.
-        Q, R_upper = np.linalg.qr(R.T)  # work with column space of R.T to find row independence
-        independent_rows = np.abs(np.diag(R_upper)) > tol
-        used_indices = np.where(independent_rows)[0]
-
-        # Optional: refine which ones specifically combine to form r (via least squares)
+        # Use least squares to find which rows contribute to r
         coeffs, residuals, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
-        nonzero = np.where(np.abs(coeffs) > tol)[0]
-
-        used_relations = [row_to_relation[i] for i in nonzero]
-
-        # Deduplicate while preserving order
-        seen = set()
-        used_relations = [r for r in used_relations if not (r in seen or seen.add(r))]
-
+        nonzero_indices = np.where(np.abs(coeffs) > tol)[0]
+        
+        # Collect unique relations from rows with non-zero coefficients
+        used_relations = {row_to_relation[i] for i in nonzero_indices}
+        
         return True, used_relations
 
     def add_row(self, row: List[Any], relation: RelationNode):
@@ -90,7 +108,7 @@ class Table:
             if relation not in self.rows:
                 self.rows[relation] = []
             self.rows[relation].append(new_row)
-            self.relations.append(relation)
+            self.relations.add(relation)
 
     def table_length(self) -> int:
         return len(self.header)

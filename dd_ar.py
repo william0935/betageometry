@@ -11,7 +11,7 @@ class DDWithAR:
         self.angle_table = AngleTable([])
         self.ratio_table = RatioTable([])
 
-        # Rule database - each rule is a method that returns List[RelationNode]
+        # Rule database - each rule is a method that returns set[RelationNode]
         # ADD THE NEW RULES HERE
         self.rules = [
             self.check_triangle_congruence_all_permutations,
@@ -181,7 +181,7 @@ class DDWithAR:
                     if col:
                         new_relations.append(Midpoint(
                             M, A, B,
-                            parents=[parents],
+                            parents=parents,
                             rule="cong_MAMB_col_MAB__midpoint_MAB"
                         ))
         
@@ -228,7 +228,7 @@ class DDWithAR:
                         if are_seg_congruent1 and are_seg_congruent2:
                             new_relations.append(CongruentTriangle1(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 + parents_segs1 + parents_segs2,
+                                parents=parents_angles1 | parents_segs1 | parents_segs2,
                                 rule="check_triangle_congruence_SAS_sameclock"
                             ))
                             continue
@@ -236,7 +236,7 @@ class DDWithAR:
                         if are_seg_congruent1 and are_seg_congruent3:
                             new_relations.append(CongruentTriangle1(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 + parents_segs1 + parents_segs3,
+                                parents=parents_angles2 | parents_segs1 | parents_segs3,
                                 rule="check_triangle_congruence_SAS_sameclock"
                             ))
                             continue
@@ -244,14 +244,14 @@ class DDWithAR:
                         if are_seg_congruent2 and are_seg_congruent3:
                             new_relations.append(CongruentTriangle1(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 + parents_segs2 + parents_segs3,
+                                parents=parents_angles3 | parents_segs2 | parents_segs3,
                                 rule="check_triangle_congruence_SAS_sameclock"
                             ))
                             continue
                     if are_seg_congruent1 and are_seg_congruent2 and are_seg_congruent3:
                         new_relations.append(CongruentTriangle1(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_segs1 + parents_segs2 + parents_segs3,
+                            parents=parents_segs1 | parents_segs2 | parents_segs3,
                             rule="check_triangle_congruence_SSS_sameclock"
                         ))
                 else:
@@ -273,7 +273,7 @@ class DDWithAR:
                         if are_seg_congruent1 and are_seg_congruent2:
                             new_relations.append(CongruentTriangle2(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 + parents_segs1 + parents_segs2,
+                                parents=parents_angles1 | parents_segs1 | parents_segs2,
                                 rule="check_triangle_congruence_SAS_opposite"
                             ))
                             continue
@@ -281,7 +281,7 @@ class DDWithAR:
                         if are_seg_congruent1 and are_seg_congruent3:
                             new_relations.append(CongruentTriangle2(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 + parents_segs1 + parents_segs3,
+                                parents=parents_angles2 | parents_segs1 | parents_segs3,
                                 rule="check_triangle_congruence_SAS_opposite"
                             ))
                             continue
@@ -289,14 +289,14 @@ class DDWithAR:
                         if are_seg_congruent2 and are_seg_congruent3:
                             new_relations.append(CongruentTriangle2(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 + parents_segs2 + parents_segs3,
+                                parents=parents_angles3 | parents_segs2 | parents_segs3,
                                 rule="check_triangle_congruence_SAS_opposite"
                             ))
                             continue
                     if are_seg_congruent1 and are_seg_congruent2 and are_seg_congruent3:
                         new_relations.append(CongruentTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_segs1 + parents_segs2 + parents_segs3,
+                            parents=parents_segs1 | parents_segs2 | parents_segs3,
                             rule="check_triangle_congruence_SSS_opposite"
                         ))
         
@@ -342,7 +342,7 @@ class DDWithAR:
                     if are_angles_equal1 and are_angles_equal2:
                         new_relations.append(SimilarTriangle1(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_angles1 + parents_angles2,
+                            parents=parents_angles1 | parents_angles2,
                             rule="check_triangle_similarity_AA_sameclock"
                         ))
                         continue
@@ -350,7 +350,7 @@ class DDWithAR:
                         if are_equal_ratio1:
                             new_relations.append(SimilarTriangle1(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 + parents_ratio1,
+                                parents=parents_angles1 | parents_ratio1,
                                 rule="check_triangle_similarity_SAS_sameclock"
                             ))
                             continue
@@ -358,7 +358,7 @@ class DDWithAR:
                         if are_equal_ratio2:
                             new_relations.append(SimilarTriangle1(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 + parents_ratio2,
+                                parents=parents_angles2 | parents_ratio2,
                                 rule="check_triangle_similarity_SAS_sameclock"
                             ))
                             continue
@@ -366,14 +366,14 @@ class DDWithAR:
                         if are_equal_ratio3:
                             new_relations.append(SimilarTriangle1(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 + parents_ratio3,
+                                parents=parents_angles3 | parents_ratio3,
                                 rule="check_triangle_similarity_SAS_sameclock"
                             ))
                             continue
                     if are_equal_ratio1 and are_equal_ratio2:
                         new_relations.append(SimilarTriangle1(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_ratio1 + parents_ratio2,
+                            parents=parents_ratio1 | parents_ratio2,
                             rule="check_triangle_similarity_SSS_sameclock"
                         ))
                 else:
@@ -394,7 +394,7 @@ class DDWithAR:
                     if are_angles_equal1 and are_angles_equal2:
                         new_relations.append(SimilarTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_angles1 + parents_angles2,
+                            parents=parents_angles1 | parents_angles2,
                             rule="check_triangle_similarity_AA_opposite"
                         ))
                         continue
@@ -402,7 +402,7 @@ class DDWithAR:
                         if are_equal_ratio1:
                             new_relations.append(SimilarTriangle2(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles1 + parents_ratio1,
+                                parents=parents_angles1 | parents_ratio1,
                                 rule="check_triangle_similarity_SAS_opposite"
                             ))
                             continue
@@ -410,7 +410,7 @@ class DDWithAR:
                         if are_equal_ratio2:
                             new_relations.append(SimilarTriangle2(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles2 + parents_ratio2,
+                                parents=parents_angles2 | parents_ratio2,
                                 rule="check_triangle_similarity_SAS_opposite"
                             ))
                             continue
@@ -418,14 +418,14 @@ class DDWithAR:
                         if are_equal_ratio3:
                             new_relations.append(SimilarTriangle2(
                                 p1, p2, p3, p4, p5, p6,
-                                parents=parents_angles3 + parents_ratio3,
+                                parents=parents_angles3 | parents_ratio3,
                                 rule="check_triangle_similarity_SAS_opposite"
                             ))
                             continue
                     if are_equal_ratio1 and are_equal_ratio2:
                         new_relations.append(SimilarTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_ratio1 + parents_ratio2,
+                            parents=parents_ratio1 | parents_ratio2,
                             rule="check_triangle_similarity_SSS_opposite"
                         ))
 
@@ -452,7 +452,7 @@ class DDWithAR:
                 if are_equal_seg1 or are_equal_seg2:
                     new_relations.append(Circle(
                         p1, p2, p4, p,
-                        parents=parents_seg1 + parents_seg2 + [cong1],
+                        parents=parents_seg1 | parents_seg2 | [cong1],
                         rule="congOAOB_congOBOC__circleOABC"
                     ))
 
@@ -478,7 +478,7 @@ class DDWithAR:
                 if are_equal_seg1 or are_equal_seg2 or are_equal_seg3:
                     new_relations.append(Cyclic(
                         p2, p3, p4, p,
-                        parents=parents1 + parents2 + parents3 + [circle],
+                        parents=parents1 | parents2 | parents3 | [circle],
                         rule="circleOABC_congOCOD__cyclicABCD"
                     ))
 
@@ -511,7 +511,7 @@ class DDWithAR:
             if are_col_1:
                 new_relations.append(Perpendicular(
                     p2, p4, p3, p4,
-                    parents=parents1 + [circle],
+                    parents=parents1 | [circle],
                     rule="circleOABC_colOAB__perpACBC"
                 ))
             
@@ -519,7 +519,7 @@ class DDWithAR:
             if are_col_2:
                 new_relations.append(Perpendicular(
                     p2, p3, p3, p4,
-                    parents=parents2 + [circle],
+                    parents=parents2 | [circle],
                     rule="circleOABC_colOAC__perpABBC"
                 ))
 
@@ -527,7 +527,7 @@ class DDWithAR:
             if are_col_3:
                 new_relations.append(Perpendicular(
                     p2, p3, p2, p4,
-                    parents=parents3 + [circle],
+                    parents=parents3 | [circle],
                     rule="circleOABC_colOBC__perpABAC"
                 ))
 
@@ -550,19 +550,19 @@ class DDWithAR:
                 if are_perp_1:
                     new_relations.append(EqualAngle(
                         p, p2, p3, p2, p4, p3,
-                        parents=parents1 + [circle],
+                        parents=parents1 | [circle],
                         rule="circleOABC_perpOAAX__eqangleXABACB"
                     ))
                 if are_perp_2:
                     new_relations.append(EqualAngle(
                         p, p3, p2, p3, p4, p2,
-                        parents=parents2 + [circle],
+                        parents=parents2 | [circle],
                         rule="circleOABC_perpOAAX__eqangleXABACB"
                     ))
                 if are_perp_3:
                     new_relations.append(EqualAngle(
                         p, p4, p2, p4, p3, p2,
-                        parents=parents3 + [circle],
+                        parents=parents3 | [circle],
                         rule="circleOABC_perpOAAX__eqangleXABACB"
                     ))
 
@@ -585,19 +585,19 @@ class DDWithAR:
                 if are_eq_1:
                     new_relations.append(Perpendicular(
                         p1, p2, p2, p,
-                        parents=parents1 + [circle],
+                        parents=parents1 | [circle],
                         rule="circleOABC_eqangleXABACB__perpOAAX"
                     ))
                 if are_eq_2:
                     new_relations.append(Perpendicular(
                         p1, p3, p3, p,
-                        parents=parents2 + [circle],
+                        parents=parents2 | [circle],
                         rule="circleOABC_eqangleXABACB__perpOAAX"
                     ))
                 if are_eq_3:
                     new_relations.append(Perpendicular(
                         p1, p4, p4, p,
-                        parents=parents3 + [circle],
+                        parents=parents3 | [circle],
                         rule="circleOABC_eqangleXABACB__perpOAAX"
                     ))
 
@@ -672,19 +672,19 @@ class DDWithAR:
                 if are_col_1 and are_eq_1:
                     new_relations.append(Midpoint(
                         p, p3, p4,
-                        parents=parents1 + parents_eq1 + [circle],
+                        parents=parents1 | parents_eq1 | [circle],
                         rule="circleOABC_colMBC_eqangleBACBOM__midpMBC"
                     ))
                 if are_col_2 and are_eq_2:
                     new_relations.append(Midpoint(
                         p, p2, p4,
-                        parents=parents2 + parents_eq2 + [circle],
+                        parents=parents2 | parents_eq2 | [circle],
                         rule="circleOABC_colMBC_eqangleCABCOM__midpMBC"
                     ))
                 if are_col_3 and are_eq_3:
                     new_relations.append(Midpoint(
                         p, p2, p3,
-                        parents=parents3 + parents_eq3 + [circle],
+                        parents=parents3 | parents_eq3 | [circle],
                         rule="circleOABC_colMBC_eqangleCABCOM__midpMBC"
                     ))
 
@@ -705,7 +705,7 @@ class DDWithAR:
             if are_equal_ratio and are_collinear and not are_not_collinear:
                 new_relations.append(EqualAngle(
                     p2, p1, p4, p4, p1, p3,
-                    parents=parents_ratio + parents_col,
+                    parents=parents_ratio | parents_col,
                     rule="eqratioDBDCABAC_colDBC__eqangleBADDAC"
                 ))
 
@@ -725,7 +725,7 @@ class DDWithAR:
             if are_collinear and not are_not_collinear:
                 new_relations.append(EqualRatio(
                     p4, p2, p4, p3, p1, p2, p1, p3,
-                    parents=parents + [eqangle],
+                    parents=parents | [eqangle],
                     rule="eqangleBADDAC_colDBC__eqratioDBDCABAC"
                 ))
 
@@ -749,7 +749,7 @@ class DDWithAR:
                 if are_seg_congruent and are_collinear:
                     new_relations.append(Congruent(
                         p1, p, p2, p,
-                        parents=parents_cong + parents_col + [perp],
+                        parents=parents_cong | parents_col | [perp],
                         rule="perpABBC_congMAMC_colMAC__congAMBM"
                     ))
 
@@ -772,7 +772,7 @@ class DDWithAR:
                 if are_seg_congruent:
                     new_relations.append(Perpendicular(
                         p1, p2, p3, p,
-                        parents=parents_cong + [cong1],
+                        parents=parents_cong | [cong1],
                         rule="congAPBP_congAQBQ__perpABPQ"
                     ))
             
@@ -783,7 +783,7 @@ class DDWithAR:
     Helper methods for specific rules starts here.
     """
 
-    def check_relation(self, rel: RelationNode) -> Tuple[bool, List[RelationNode]]:
+    def check_relation(self, rel: RelationNode) -> Tuple[bool, set[RelationNode]]:
         """Check if a specific relation is discovered."""
         if isinstance(rel, Congruent):
             p1, p2, p3, p4 = rel.points
@@ -812,7 +812,7 @@ class DDWithAR:
             p1, p2, p3, p4 = rel.points
             return self.are_points_perpendicular(p1, p2, p3, p4)
         else:
-            return False, []
+            return False, set()
     
     def update_AR_tables_with_relation(self, rel: RelationNode):
         """Update AR tables when a new relation is discovered."""
@@ -835,11 +835,11 @@ class DDWithAR:
                 ((p5.x - p4.x) * (p6.y - p4.y) - (p5.y - p4.y) * (p6.x - p4.x)) > 0
     
     # checks if two segments are congruent via AR table
-    def are_segments_congruent(self, seg1: frozenset, seg2: frozenset) -> Tuple[bool, List[RelationNode]]:
+    def are_segments_congruent(self, seg1: frozenset, seg2: frozenset) -> Tuple[bool, set[RelationNode]]:
         if seg1 == seg2:
-            return True, []
+            return True, set()
         if seg1 not in self.ratio_table.col_id or seg2 not in self.ratio_table.col_id:
-            return False, []
+            return False, set()
         cong_row = [0] * self.ratio_table.table_length()
         cong_row[self.ratio_table.col_id[seg1]] = 1
         cong_row[self.ratio_table.col_id[seg2]] = -1
@@ -848,17 +848,17 @@ class DDWithAR:
         return is_spanned, parents
 
     # checks if two angles are equal via AR table
-    def are_angles_equal(self, angle1: Tuple[frozenset, frozenset], angle2: Tuple[frozenset, frozenset]) -> Tuple[bool, List[RelationNode]]:
+    def are_angles_equal(self, angle1: Tuple[frozenset, frozenset], angle2: Tuple[frozenset, frozenset]) -> Tuple[bool, set[RelationNode]]:
         seg1_1, seg1_2 = angle1
         seg2_1, seg2_2 = angle2
         if not self.angles_look_equal(angle1, angle2):
-            return False, []
+            return False, set()
 
         if (seg1_1 not in self.angle_table.col_id or
             seg1_2 not in self.angle_table.col_id or
             seg2_1 not in self.angle_table.col_id or
             seg2_2 not in self.angle_table.col_id):
-            return False, []
+            return False, set()
         
         angle_row = [0] * self.angle_table.table_length()
         angle_row[self.angle_table.col_id[seg1_1]] += 1
@@ -869,11 +869,11 @@ class DDWithAR:
         is_spanned, parents = self.angle_table.is_spanned(angle_row)
         return is_spanned, parents
 
-    def are_equal_ratio(self, a: frozenset, b: frozenset, c: frozenset, d: frozenset) -> Tuple[bool, List[RelationNode]]:
+    def are_equal_ratio(self, a: frozenset, b: frozenset, c: frozenset, d: frozenset) -> Tuple[bool, set[RelationNode]]:
         """Check if a/b = c/d via the RatioTable."""
         if (a not in self.ratio_table.col_id or b not in self.ratio_table.col_id or
             c not in self.ratio_table.col_id or d not in self.ratio_table.col_id):
-            return False, []
+            return False, set()
         row = [0] * self.ratio_table.table_length()
         row[self.ratio_table.col_id[a]] += 1
         row[self.ratio_table.col_id[b]] -= 1
@@ -883,17 +883,17 @@ class DDWithAR:
         is_spanned, parents = self.ratio_table.is_spanned(row)
         return is_spanned, parents
 
-    def are_points_collinear(self, p1: Point, p2: Point, p3: Point) -> Tuple[bool, List[RelationNode]]:
+    def are_points_collinear(self, p1: Point, p2: Point, p3: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if three points are collinear via the AngleTable."""
         if (frozenset({p1, p2}) not in self.angle_table.col_id or
             frozenset({p2, p3}) not in self.angle_table.col_id or
             frozenset({p1, p3}) not in self.angle_table.col_id):
-            return False, []
+            return False, set()
 
         gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
         gradient2 = (p3.y - p2.y) / (p3.x - p2.x)
         if abs(gradient1 - gradient2) > 1e-6:
-            return False, []
+            return False, set()
 
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[frozenset({p1, p2})]] += 1
@@ -905,19 +905,19 @@ class DDWithAR:
         is_spanned1, parents1 = self.angle_table.is_spanned(row1)
         is_spanned2, parents2 = self.angle_table.is_spanned(row2)
         if is_spanned1 and is_spanned2:
-            return True, parents1 + parents2
-        return False, []
+            return True, parents1 | parents2
+        return False, set()
 
-    def are_points_parallel(self, p1: Point, p2: Point, p3: Point, p4: Point) -> Tuple[bool, List[RelationNode]]:
+    def are_points_parallel(self, p1: Point, p2: Point, p3: Point, p4: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if two lines (p1,p2) and (p3,p4) are parallel via the AngleTable."""
         if (frozenset({p1, p2}) not in self.angle_table.col_id or
             frozenset({p3, p4}) not in self.angle_table.col_id):
-            return False, []
+            return False, set()
 
         gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
         gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
         if abs(gradient1 - gradient2) > 1e-6:
-            return False, []
+            return False, set()
         
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
@@ -928,16 +928,16 @@ class DDWithAR:
         is_spanned, parents = self.angle_table.is_spanned(row)
         return is_spanned, parents
 
-    def are_points_perpendicular(self, p1: Point, p2: Point, p3: Point, p4: Point) -> Tuple[bool, List[RelationNode]]:
+    def are_points_perpendicular(self, p1: Point, p2: Point, p3: Point, p4: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if two lines (p1,p2) and (p3,p4) are perpendicular via the AngleTable."""
         if (frozenset({p1, p2}) not in self.angle_table.col_id or
             frozenset({p3, p4}) not in self.angle_table.col_id):
-            return False, []
+            return False, set()
 
         gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
         gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
         if abs(gradient1 * gradient2 + 1) > 1e-6:
-            return False, []
+            return False, set()
 
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
@@ -954,14 +954,14 @@ class DDWithAR:
         is_spanned1, parents1 = self.angle_table.is_spanned(row1)
         is_spanned2, parents2 = self.angle_table.is_spanned(row2)
         if is_spanned1 and is_spanned2:
-            return True, parents1 + parents2
+            return True, parents1 | parents2
         elif is_spanned1:
             return True, parents1
         elif is_spanned2:
             return True, parents2
-        return False, []
+        return False, set()
 
-    def is_midpoint(self, mid: Point, p1: Point, p2: Point) -> Tuple[bool, List[RelationNode]]:
+    def is_midpoint(self, mid: Point, p1: Point, p2: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if mid is the midpoint of segment p1p2 via the RatioTable."""
         seg1 = frozenset({mid, p1})
         seg2 = frozenset({mid, p2})
@@ -969,8 +969,8 @@ class DDWithAR:
         is_congruent, parents_cong = self.are_segments_congruent(seg1, seg2)
         is_collinear, parents_col = self.are_points_collinear(mid, p1, p2)
         if is_congruent and is_collinear:
-            return True, parents_cong + parents_col
-        return False, []
+            return True, parents_cong | parents_col
+        return False, set()
 
     def form_triangle(self, points: List[Point]) -> Optional[Tuple[Point, Point, Point, Point]]:
         """Given four points from a congruence relation, return them as triangle points; 

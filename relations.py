@@ -24,12 +24,12 @@ PERPENDICULAR_ANGLE = (frozenset({ZERO_ZERO, UNIT_X}), frozenset({ZERO_ZERO, UNI
 
 # Base class for relations
 class RelationNode:
-    def __init__(self, name: str, index: int, relation, parents: Optional[List["RelationNode"]] = None, rule: Optional[str] = None,
+    def __init__(self, name: str, index: int, relation, parents: Optional[set["RelationNode"]] = None, rule: Optional[str] = None,
                  representation: str = "", equivalent: Optional[List["RelationNode"]] = None):
         self.name = name
         self.index = index
         self.relation = relation
-        self.parents = parents if parents is not None else []
+        self.parents = parents if parents is not None else set()
         self.rule = rule if rule is not None else ""
         self.representation = representation
         self.equivalent = equivalent if equivalent is not None else []
@@ -53,7 +53,7 @@ class RelationNode:
 class Congruent(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="cong",
@@ -71,7 +71,7 @@ class EqualAngle(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="eqangle",
@@ -90,7 +90,7 @@ class EqualAngle(RelationNode):
 #     def __init__(self, p1: Point, p2: Point, p3: Point,
 #                  p4: Point, p5: Point, p6: Point,
 #                  index: Optional[int] = None,
-#                  parents: Optional[List[RelationNode]] = None,
+#                  parents: Optional[set[RelationNode]] = None,
 #                  rule: Optional[str] = None):
 #         super().__init__(
 #             name="sameclock",
@@ -105,7 +105,7 @@ class EqualAngle(RelationNode):
 class Parallel(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="para",
@@ -128,7 +128,7 @@ class Parallel(RelationNode):
 class Perpendicular(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="perp",
@@ -145,7 +145,7 @@ class Perpendicular(RelationNode):
 class Collinear(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="col",
@@ -162,7 +162,7 @@ class Collinear(RelationNode):
 class Cyclic(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="cyclic",
@@ -186,7 +186,7 @@ class SimilarTriangle1(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="simtri1",
@@ -217,7 +217,7 @@ class SimilarTriangle2(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="simtri2",
@@ -248,7 +248,7 @@ class CongruentTriangle1(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="contri1",
@@ -279,7 +279,7 @@ class CongruentTriangle2(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point,
                  p4: Point, p5: Point, p6: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="contri2",
@@ -309,7 +309,7 @@ class CongruentTriangle2(RelationNode):
 class Midpoint(RelationNode):
     def __init__(self, mid: Point, p1: Point, p2: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="midp",
@@ -331,7 +331,7 @@ class EqualRatio(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  p5: Point, p6: Point, p7: Point, p8: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="eqratio",
@@ -349,7 +349,7 @@ class EqualRatio(RelationNode):
 class Circle(RelationNode):
     def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
                  index: Optional[int] = None,
-                 parents: Optional[List[RelationNode]] = None,
+                 parents: Optional[set[RelationNode]] = None,
                  rule: Optional[str] = None):
         super().__init__(
             name="circle",

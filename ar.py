@@ -22,55 +22,11 @@ class Table:
         for relation_node, row_list in self.rows.items():
             for i in range(len(row_list)):
                 row_list[i] = np.append(row_list[i], 0)
-    
-    # def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, set[RelationNode]]:
-    #     """Check if `row` is in the rowspan of existing rows, and identify which relations were used."""
-    #     if not self.rows:
-    #         return False, set()
-
-    #     # Flatten all existing rows and track which relation they come from
-    #     all_rows = []
-    #     row_to_relation = []
-    #     for relation_key, row_list in self.rows.items():
-    #         for r in row_list:
-    #             all_rows.append(np.asarray(r, dtype=float))
-    #             row_to_relation.append(relation_key)
-
-    #     R = np.vstack(all_rows)
-    #     r = np.asarray(row, dtype=float)
-
-    #     # --- Check if r is in rowspan(R) ---
-    #     rank_R = np.linalg.matrix_rank(R, tol=tol)
-    #     rank_aug = np.linalg.matrix_rank(np.vstack([R, r]), tol=tol)
-    #     is_spanned = (rank_R == rank_aug)
-
-    #     if not is_spanned:
-    #         return False, set()
-
-    #     # --- Find which rows are needed ---
-    #     # Compute a reduced row echelon form (numerically via QR decomposition)
-    #     # The pivot rows correspond to linearly independent rows.
-    #     Q, R_upper = np.linalg.qr(R.T)  # work with column space of R.T to find row independence
-    #     independent_rows = np.abs(np.diag(R_upper)) > tol
-    #     used_indices = np.where(independent_rows)[0]
-
-    #     # Optional: refine which ones specifically combine to form r (via least squares)
-    #     coeffs, residuals, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
-    #     nonzero = np.where(np.abs(coeffs) > tol)[0]
-
-    #     used_relations = [row_to_relation[i] for i in nonzero]
-
-    #     # Deduplicate while preserving order
-    #     seen = set()
-    #     used_relations = [r for r in used_relations if not (r in seen or seen.add(r))]
-
-    #     return True, used_relations
 
     def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, set[RelationNode]]:
         if not self.rows:
             return False, set()
-        
-        # Flatten all existing rows and track which relation they come from
+
         all_rows = []
         row_to_relation = []
         for relation_key, row_list in self.rows.items():
@@ -80,21 +36,16 @@ class Table:
         
         R = np.vstack(all_rows)
         r = np.asarray(row, dtype=float)
-        
-        # --- Check if r is in rowspan(R) ---
         rank_R = np.linalg.matrix_rank(R, tol=tol)
         rank_aug = np.linalg.matrix_rank(np.vstack([R, r]), tol=tol)
         is_spanned = (rank_R == rank_aug)
         
         if not is_spanned:
             return False, set()
-        
-        # --- Find which rows are needed ---
-        # Use least squares to find which rows contribute to r
-        coeffs, residuals, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
+
+        coeffs, _, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
         nonzero_indices = np.where(np.abs(coeffs) > tol)[0]
-        
-        # Collect unique relations from rows with non-zero coefficients
+
         used_relations = {row_to_relation[i] for i in nonzero_indices}
         
         return True, used_relations
@@ -115,7 +66,6 @@ class Table:
 
 class AngleTable(Table):
     def __init__(self, header: List[Any]):
-        # Ensure the first column is the 90-degree constant
         base_header = [col for col in header if col != CONST_90]
         ordered_header = [CONST_90] + base_header
         super().__init__(ordered_header)
@@ -188,7 +138,6 @@ class AngleTable(Table):
         helper_add_collinear(s2, s3)
 
     def add_perpendicular(self, perpendicular: Perpendicular):
-        # perp A B C D => AB - CD - 90 = 0
         p1, p2, p3, p4 = perpendicular.points
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
@@ -201,12 +150,12 @@ class AngleTable(Table):
         # print(p1, p2, p3, p4, angle1 / math.pi * 180, angle2 / math.pi * 180)
 
         if angle1 < angle2:
-            seg1, seg2 = seg2, seg1 # ensure consistent ordering, not sure if correct
+            seg1, seg2 = seg2, seg1
 
         coefficients: Dict[Any, int] = {}
         coefficients[seg1] = coefficients.get(seg1, 0) + 1
         coefficients[seg2] = coefficients.get(seg2, 0) - 1
-        coefficients[CONST_90] = coefficients.get(CONST_90, 0) - 1  # subtract 90 constant
+        coefficients[CONST_90] = coefficients.get(CONST_90, 0) - 1
 
         for seg in (seg1, seg2):
             if seg not in self.col_id:
@@ -265,3 +214,49 @@ class RatioTable(Table):
                 row[self.col_id[seg]] = coeff
 
         self.add_row(row, cong)
+
+class AreaTable(Table):
+    # for signed areas
+    def is_sameclock(self, p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Point) -> bool:
+        return ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)) * \
+                ((p5.x - p4.x) * (p6.y - p4.y) - (p5.y - p4.y) * (p6.x - p4.x)) > 0
+    
+    # each column represents a triangle formed by the two points and the origin(denoted by ZERO_ZERO)
+    def __init__(self, header: List[frozenset[Point]]):
+        super().__init__(header)
+
+    def add_eqarea(self, eqarea: EqArea):
+        p1, p2, p3, p4, p5, p6 = eqarea.points
+
+        coefficients = {}
+        seg1 = frozenset({p1, p2})
+        seg2 = frozenset({p1, p3})
+        seg3 = frozenset({p2, p3})
+        seg4 = frozenset({p4, p5})
+        seg5 = frozenset({p4, p6})
+        seg6 = frozenset({p5, p6})
+        if (self.is_sameclock(p1, p2, p3, p4, p5, p6)):
+            coefficients[seg1] = coefficients.get(seg1, 0) + 1
+            coefficients[seg2] = coefficients.get(seg2, 0) + 1
+            coefficients[seg3] = coefficients.get(seg3, 0) + 1
+            coefficients[seg4] = coefficients.get(seg4, 0) - 1
+            coefficients[seg5] = coefficients.get(seg5, 0) - 1
+            coefficients[seg6] = coefficients.get(seg6, 0) - 1
+        else:
+            coefficients[seg1] = coefficients.get(seg1, 0) + 1
+            coefficients[seg2] = coefficients.get(seg2, 0) + 1
+            coefficients[seg3] = coefficients.get(seg3, 0) + 1
+            coefficients[seg4] = coefficients.get(seg4, 0) + 1
+            coefficients[seg5] = coefficients.get(seg5, 0) + 1
+            coefficients[seg6] = coefficients.get(seg6, 0) + 1
+
+        for seg in coefficients:
+            if seg not in self.col_id:
+                self.add_col(seg)
+        
+        row = [0] * len(self.header)
+        for seg, coeff in coefficients.items():
+            if coeff != 0:
+                row[self.col_id[seg]] = coeff
+        
+        self.add_row(row, eqarea)

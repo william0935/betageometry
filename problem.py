@@ -5,7 +5,7 @@ from itertools import combinations, permutations
 import numpy as np
 
 RELATION_TYPES = ["cong", "eqangle", "para", "perp", "col", "cyclic", "eqratio",
-                  "simtri1", "simtri2", "contri1", "contri2", "midp", "circle"]
+                  "simtri1", "simtri2", "contri1", "contri2", "midp", "circle", "eqarea"]
 
 class Problem:
     def __init__(self, name: str, points: List[Point],

@@ -59,6 +59,8 @@ def get_relation(rel_str, all_points):
         relation = EqualRatio(points[0], points[1], points[2], points[3], points[4], points[5], points[6], points[7])
     elif word == 'circle':
         relation = Circle(points[0], points[1], points[2], points[3])
+    elif word == 'eqarea':
+        relation = EqArea(points[0], points[1], points[2], points[3], points[4], points[5])
     else:
         raise ValueError(f"Relation type {word} not recognized.")
     

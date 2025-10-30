@@ -367,6 +367,24 @@ class Circle(RelationNode):
 
         self.points = [p1, p2, p3, p4]
 
+class EqArea(RelationNode):
+    def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[set[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="eqarea",
+            index=index,
+            relation=(frozenset({p1, p2}), frozenset({p3, p4})),
+            representation=f"eqarea {p1} {p2} {p3} {p4} {p5} {p6}",
+            parents=parents,
+            rule=rule,
+            equivalent=[
+                # idk what to put here yet
+            ]
+        )
+
+        self.points = [p1, p2, p3, p4, p5, p6]
 
 if __name__ == "__main__":
     pass

@@ -10,8 +10,8 @@ class DDWithAR:
         self.problem = problem
         self.angle_table = AngleTable([])
         self.ratio_table = RatioTable([])
+        self.area_table = AreaTable([])
 
-        # Rule database - each rule is a method that returns set[RelationNode]
         # ADD THE NEW RULES HERE
         self.rules = [
             self.check_triangle_congruence_all_permutations,
@@ -32,16 +32,12 @@ class DDWithAR:
         ]
 
     def print_table(self, table):
-        """Print a table (AngleTable or RatioTable) in a readable format."""
         if not table.rows:
             print("  (empty)")
             print()
             return
-            
-        # Create header row with column indices and segment names
+
         header_indices = "         " + "".join(f"     [{i:1d}]" for i in range(len(table.header)))
-        
-        # Format segment names properly
         segment_names = []
         for col in table.header:
             if isinstance(col, frozenset):
@@ -53,9 +49,8 @@ class DDWithAR:
         
         print(header_indices)
         print(header_names)
-        print("  " + "-" * (len(header_indices) - 2))  # Separator line
-        
-        # Print each row with proper spacing
+        print("  " + "-" * (len(header_indices) - 2))
+
         row_index = 0
         for relation, row_list in table.rows.items():
             for row in row_list:
@@ -63,7 +58,7 @@ class DDWithAR:
                 row_str += f"  # {relation}"
                 print(row_str)
                 row_index += 1
-        print()  # Empty line for separation
+        print()
 
     def apply_deduction_rules(self, max_iterations: int) -> bool:
         # initialize all the names of the angles and segments into the angle table and ratio table
@@ -87,44 +82,44 @@ class DDWithAR:
             self.angle_table.add_collinear(col)
         for perp in self.problem.relations.get("perp", []):
             self.angle_table.add_perpendicular(perp)
+        for area in self.problem.relations.get("eqarea", []):
+            self.area_table.add_eqarea(area)
 
         print("Initial Angle Table:")
         self.print_table(self.angle_table)
         print("Initial Ratio Table:")
         self.print_table(self.ratio_table)
+        print("Initial Area Table:")
+        self.print_table(self.area_table)
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
             progress_made = False
             new_relations = []
-            
-            # Apply all rules from the rule database
+
             for rule in self.rules:
                 new_relations.extend(rule())
-            
-            # Add any new relations found and track if they're actually new
+
             for new_rel in new_relations:
                 progress = self.problem.add_relation(new_rel)
                 if progress:
                     progress_made = True
                     # print("Derived new relation: ", new_rel)
-                    
-                    # Update AR tables with the new relation and its equivalents
+
                     self.update_AR_tables_with_relation(new_rel)
-                    
-                    # Also update AR tables with any equivalent relations
                     if hasattr(new_rel, 'equivalent') and new_rel.equivalent:
                         for equiv_rel in new_rel.equivalent:
                             self.update_AR_tables_with_relation(equiv_rel)
-            
-            # Check if we made progress
+
             if not progress_made:
                 print(f"No new relations in iteration {iteration}. Stopping.")
                 print("Final Angle Table:")
                 self.print_table(self.angle_table)
                 print("Final Ratio Table:")
                 self.print_table(self.ratio_table)
-                break  # No new relations derived, stop
+                print("Final Area Table:")
+                self.print_table(self.area_table)
+                break
                 
             if self.problem.is_solved():
                 print(f"Problem solved in iteration {iteration}!")
@@ -132,6 +127,8 @@ class DDWithAR:
                 self.print_table(self.angle_table)
                 print("Final Ratio Table:")
                 self.print_table(self.ratio_table)
+                print("Final Area Table:")
+                self.print_table(self.area_table)
                 return True
             
             for goal in self.problem.remaining_goals:
@@ -169,7 +166,6 @@ class DDWithAR:
             seg_MA = frozenset({M, A})
             seg_MB = frozenset({M, B})
 
-            # Use RatioTable (length equality), not AngleTable (direction)
             if seg_MA in self.ratio_table.col_id and seg_MB in self.ratio_table.col_id:
                 cong_row = [0] * self.ratio_table.table_length()
                 cong_row[self.ratio_table.col_id[seg_MA]] = 1
@@ -1156,6 +1152,8 @@ class DDWithAR:
             self.angle_table.add_parallel(rel)
         elif isinstance(rel, Perpendicular):
             self.angle_table.add_perpendicular(rel)
+        elif isinstance(rel, EqArea):
+            self.area_table.add_eqarea(rel)
     
     # checks sameclock
     def is_sameclock(self, p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Point) -> bool:
@@ -1280,12 +1278,12 @@ class DDWithAR:
 
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[seg1]] = 1
-        row1[self.angle_table.col_id[seg2]] = -1  # Perpendicularity represented differently
+        row1[self.angle_table.col_id[seg2]] = -1
         row1[self.angle_table.col_id[CONST_90]] = 1
 
         row2 = [0] * self.angle_table.table_length()
         row2[self.angle_table.col_id[seg1]] = 1
-        row2[self.angle_table.col_id[seg2]] = -1  # Perpendicularity represented differently
+        row2[self.angle_table.col_id[seg2]] = -1
         row2[self.angle_table.col_id[CONST_90]] = -1
 
         is_spanned1, parents1 = self.angle_table.is_spanned(row1)
@@ -1324,7 +1322,7 @@ class DDWithAR:
         else:
             return None, None, None, None
         
-        return p1, p2, p3, p4  # p1 = p3
+        return p1, p2, p3, p4
     
     def angles_look_equal(self, angle1: Tuple[frozenset, frozenset], angle2: Tuple[frozenset, frozenset]) -> bool:
         """Heuristic check if two angles look equal based on points."""
@@ -1340,3 +1338,39 @@ class DDWithAR:
         angle1 = (angle1 + math.pi) % math.pi
         angle2 = (angle2 + math.pi) % math.pi
         return abs(angle1 - angle2) < 1e-6
+
+    def are_areas_equal(self, points: List[Point]) -> Tuple[bool, set[RelationNode]]:
+        area_row = [0] * self.area_table.table_length()
+        p1, p2, p3, p4, p5, p6 = points
+        seg1 = frozenset({p1, p2})
+        seg2 = frozenset({p1, p3})
+        seg3 = frozenset({p2, p3})
+        seg4 = frozenset({p4, p5})
+        seg5 = frozenset({p4, p6})
+        seg6 = frozenset({p5, p6})
+
+        if (seg1 not in self.area_table.col_id or
+            seg2 not in self.area_table.col_id or
+            seg3 not in self.area_table.col_id or
+            seg4 not in self.area_table.col_id or
+            seg5 not in self.area_table.col_id or
+            seg6 not in self.area_table.col_id):
+            return False, set()
+
+        if (self.is_sameclock(p1, p2, p3, p4, p5, p6)):
+            area_row[self.area_table.col_id[seg1]] += 1
+            area_row[self.area_table.col_id[seg2]] += 1
+            area_row[self.area_table.col_id[seg3]] += 1
+            area_row[self.area_table.col_id[seg4]] -= 1
+            area_row[self.area_table.col_id[seg5]] -= 1
+            area_row[self.area_table.col_id[seg6]] -= 1
+        else:
+            area_row[self.area_table.col_id[seg1]] += 1
+            area_row[self.area_table.col_id[seg2]] += 1
+            area_row[self.area_table.col_id[seg3]] += 1
+            area_row[self.area_table.col_id[seg4]] += 1
+            area_row[self.area_table.col_id[seg5]] += 1
+            area_row[self.area_table.col_id[seg6]] += 1
+
+        is_spanned, parents = self.area_table.is_spanned(area_row)
+        return is_spanned, parents

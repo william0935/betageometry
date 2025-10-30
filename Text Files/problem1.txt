@@ -1,1 +1,1 @@
-circle O B R D; cong O B O Y; col B O D; eqangle B O R Y O D; ? contri2 R B D Y D B
+eqarea O R B O D Y; circle O B R D; cong O B O Y; col B O D; eqangle B O R Y O D; ? contri2 R B D Y D B

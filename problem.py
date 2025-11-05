@@ -20,7 +20,9 @@ class Problem:
         self.relations = {r : [] for r in RELATION_TYPES}
         self.index_counter = 1
         self.deduction_steps = []
-        self.similar_triangle_pairs = self.check_similar_triangle_pairs()
+        self.similar_triangle_pairs = self.find_similar_triangle_pairs()
+        self.cyclic_quads = self.find_cyclic_quads()
+        print(self.cyclic_quads)
         for r in self.assumptions:
             r.add_index(self.index_counter)
             self.index_counter += 1
@@ -99,7 +101,7 @@ class Problem:
             return (frozenset({p1, p2}), frozenset({p2, p3})) == (frozenset({p4, p5}), frozenset({p5, p6}))
         elif relation.name == "contri1" or relation.name == "contri2":
             p1, p2, p3, p4, p5, p6 = relation.points
-            return set((p1, p2, p3)) == set((p4, p5, p6))
+            return (p1, p2, p3) == (p4, p5, p6)
         elif relation.name == "simtri1" or relation.name == "simtri2":
             p1, p2, p3, p4, p5, p6 = relation.points
             return set((p1, p2, p3)) == set((p4, p5, p6)) or \
@@ -130,8 +132,8 @@ class Problem:
 
         return steps_str
 
-    def check_similar_triangle_pairs(self, tol=1e-5) -> List[Tuple[Point, Point, Point, Point, Point, Point]]:
-        "check all possible similar triangle pairs among the points according to the diagram"
+    def find_similar_triangle_pairs(self, tol=1e-5) -> List[Tuple[Point, Point, Point, Point, Point, Point]]:
+        "find all possible similar triangle pairs among the points according to the diagram"
         points = self.points
         pairs = []
         for p1, p2, p3 in combinations(points, 3):
@@ -143,6 +145,20 @@ class Problem:
                    abs(self.angle_value(p3, p1, p2) - self.angle_value(p6, p4, p5)) < tol:
                     pairs.append((p1, p2, p3, p4, p5, p6))
         return pairs
+    
+    def find_cyclic_quads(self, tol=1e-5) -> List[Tuple[Point, Point, Point, Point]]:
+        "find all possible cyclic quadrilaterals among the points according to the diagram"
+        points = self.points
+        quads = []
+        for p1, p2 in combinations(points, 2):
+            for p3, p4 in permutations(points, 2):
+                if len({p1, p2, p3, p4}) < 4:
+                    continue
+                angle1 = self.angle_value(p1, p3, p2)
+                angle2 = self.angle_value(p1, p4, p2)
+                if abs(angle1 + angle2 - 180) < tol or abs(angle1 - angle2) < tol:
+                    quads.append((p1, p2, p3, p4))
+        return quads
 
     def angle_value(self, a: Point, b: Point, c: Point) -> float:
         "compute the angle value of angle ABC in degrees"

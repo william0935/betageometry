@@ -3,6 +3,11 @@ from relations import *
 import numpy as np
 from typing import List, Tuple, Dict, Any, Optional
 
+# checks sameclock
+def is_sameclock(p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Point) -> bool:
+    return ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)) * \
+            ((p5.x - p4.x) * (p6.y - p4.y) - (p5.y - p4.y) * (p6.x - p4.x)) > 0
+
 # Special column key: represents a fixed +90 degrees constant in column 0
 CONST_90 = "90_degrees"
 
@@ -215,12 +220,9 @@ class RatioTable(Table):
 
         self.add_row(row, cong)
 
-class AreaTable(Table):
-    # for signed areas
-    def is_sameclock(self, p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Point) -> bool:
-        return ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)) * \
-                ((p5.x - p4.x) * (p6.y - p4.y) - (p5.y - p4.y) * (p6.x - p4.x)) > 0
-    
+
+## TODO: fix the area to the right config
+class AreaTable(Table):    
     # each column represents a triangle formed by the two points and the origin(denoted by ZERO_ZERO)
     def __init__(self, header: List[frozenset[Point]]):
         super().__init__(header)
@@ -229,13 +231,14 @@ class AreaTable(Table):
         p1, p2, p3, p4, p5, p6 = eqarea.points
 
         coefficients = {}
-        seg1 = frozenset({p1, p2})
-        seg2 = frozenset({p1, p3})
-        seg3 = frozenset({p2, p3})
-        seg4 = frozenset({p4, p5})
-        seg5 = frozenset({p4, p6})
-        seg6 = frozenset({p5, p6})
-        if (self.is_sameclock(p1, p2, p3, p4, p5, p6)):
+        seg1 = frozenset([p1, p2])
+        seg2 = frozenset([p1, p3])
+        seg3 = frozenset([p2, p3])
+        seg4 = frozenset([p4, p5])
+        seg5 = frozenset([p4, p6])
+        seg6 = frozenset([p5, p6])
+
+        if (is_sameclock(p1, p2, p3, p4, p5, p6)):
             coefficients[seg1] = coefficients.get(seg1, 0) + 1
             coefficients[seg2] = coefficients.get(seg2, 0) + 1
             coefficients[seg3] = coefficients.get(seg3, 0) + 1

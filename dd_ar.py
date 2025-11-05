@@ -201,7 +201,7 @@ class DDWithAR:
             seg2_2 = frozenset({p5, p6})
             seg2_3 = frozenset({p4, p6})
 
-            if self.is_sameclock(p1, p2, p3, p4, p5, p6):
+            if is_sameclock(p1, p2, p3, p4, p5, p6):
                 angle1_1 = (seg1_1, seg1_2)
                 angle1_2 = (seg1_1, seg1_3)
                 angle1_3 = (seg1_2, seg1_3)
@@ -501,7 +501,7 @@ class DDWithAR:
             seg2_2 = frozenset({p5, p6})
             seg2_3 = frozenset({p4, p6})
 
-            if self.is_sameclock(p1, p2, p3, p4, p5, p6):
+            if is_sameclock(p1, p2, p3, p4, p5, p6):
                 angle1_1 = (seg1_1, seg1_2)
                 angle1_2 = (seg1_1, seg1_3)
                 angle1_3 = (seg1_2, seg1_3)
@@ -810,14 +810,14 @@ class DDWithAR:
     
     def eqangleABCADC__cyclicABCD(self) -> List[RelationNode]:
         """Check for cyclic quadrilateral formation from equal angles."""
-        relations_to_check = self.problem.relations.get("eqangle", [])
         new_relations = []
-        for eqangle in relations_to_check:
-            p1, p2, p3, p4, p5, p6 = eqangle.points
-            if p1 == p4 and p3 == p6:
+        cyclic_quads = self.problem.cyclic_quads
+        for (p1, p2, p3, p4) in cyclic_quads:
+            are_eq_angle, parents = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p3}), frozenset({p4, p3})))
+            if are_eq_angle:
                 new_relations.append(Cyclic(
-                    p1, p2, p3, p5,
-                    parents={eqangle},
+                    p1, p2, p3, p4,
+                    parents=parents,
                     rule="eqangleABCADC__cyclicABCD"
                 ))
 
@@ -1101,7 +1101,6 @@ class DDWithAR:
                     ))
             
         return new_relations
-    
 
     """
     Helper methods for specific rules starts here.
@@ -1154,11 +1153,6 @@ class DDWithAR:
             self.angle_table.add_perpendicular(rel)
         elif isinstance(rel, EqArea):
             self.area_table.add_eqarea(rel)
-    
-    # checks sameclock
-    def is_sameclock(self, p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Point) -> bool:
-        return ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)) * \
-                ((p5.x - p4.x) * (p6.y - p4.y) - (p5.y - p4.y) * (p6.x - p4.x)) > 0
     
     # checks if two segments are congruent via AR table
     def are_segments_congruent(self, seg1: frozenset, seg2: frozenset) -> Tuple[bool, set[RelationNode]]:
@@ -1357,7 +1351,7 @@ class DDWithAR:
             seg6 not in self.area_table.col_id):
             return False, set()
 
-        if (self.is_sameclock(p1, p2, p3, p4, p5, p6)):
+        if (is_sameclock(p1, p2, p3, p4, p5, p6)):
             area_row[self.area_table.col_id[seg1]] += 1
             area_row[self.area_table.col_id[seg2]] += 1
             area_row[self.area_table.col_id[seg3]] += 1

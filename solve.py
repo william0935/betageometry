@@ -7,18 +7,19 @@ from dd import *
 from dd_ar import *
 from Problem import *
 from matplotlib import pyplot as plt
+import time, datetime
 
-problem_name = "problem1"
+problem_name = "problem6"
 
 # parse info from .ggb through Read_in_Geogebra_File.py
 points_dict, lines, circles = parse_picture(f"{problem_name}.ggb")
 
 # draw initial setup
-fig, ax = setup_geometry_plot()
-plot_points(ax, points_dict)
-plot_lines_from_eq(ax, lines)
-plot_circles_from_eq(ax, circles)
-
+plotter = ConstructionPlotter()
+fig, ax = plotter.setup_geometry_plot()
+plotter.plot_points(ax, points_dict)
+plotter.plot_lines_from_eq(ax, lines)
+plotter.plot_circles_from_eq(ax, circles)
 
 # create starting points
 points = []
@@ -35,7 +36,10 @@ problem = Problem(problem_name, points, assumptions, goals)
 # call dd.py or dd_ar.py until solved
 solver = DDWithAR(problem)
 # solver = DeductiveDatabase(problem)
+start = time.perf_counter()
 solver.apply_deduction_rules(50)
+end = time.perf_counter()
 print(solver.problem)
+print(f"Time taken: {end - start} seconds")
 
 plt.show()

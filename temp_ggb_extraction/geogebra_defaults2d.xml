@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<geogebra format="5.0" version="5.2.902.0" app="suite" subApp="geometry" platform="w"  xsi:noNamespaceSchemaLocation="http://www.geogebra.org/apps/xsd/ggt.xsd" xmlns="" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" >
+<geogebra format="5.0" version="5.2.904.2" app="suite" subApp="geometry" platform="w"  xsi:noNamespaceSchemaLocation="http://www.geogebra.org/apps/xsd/ggt.xsd" xmlns="" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" >
 <defaults>
 <element type="point" label="Point (free)" default="10">
 	<show object="true" label="true"/>
@@ -19,7 +19,7 @@
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="0.1" speed="1" type="1" playing="false"/>
-	<pointSize val="4"/>
+	<pointSize val="5"/>
 	<pointStyle val="0"/>
 	<coords x="NaN" y="NaN" z="NaN"/>
 </element>
@@ -30,7 +30,7 @@
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="1" speed="1" type="1" playing="false"/>
-	<pointSize val="4"/>
+	<pointSize val="5"/>
 	<pointStyle val="10"/>
 	<coords x="NaN" y="NaN" z="NaN"/>
 </element>
@@ -70,32 +70,32 @@
 </element>
 <element type="line" label="Line" default="20">
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="0.1" speed="1" type="0" playing="false"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
 	<eqnStyle style="implicit"/>
 	<coords x="NaN" y="NaN" z="NaN"/>
 </element>
 <element type="function" label="Curve" default="3400">
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="true"/>
 	<labelMode val="4"/>
 	<animation step="1" speed="1" type="0" playing="false"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
 </element>
 <element type="segment" label="Segment" default="21">
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="0.1" speed="1" type="0" playing="false"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
 	<eqnStyle style="implicit"/>
 	<outlyingIntersections val="false"/>
 	<keepTypeOnTransform val="true"/>
@@ -105,12 +105,12 @@
 </element>
 <element type="ray" label="Segment" default="25">
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="1" speed="1" type="0" playing="false"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
 	<eqnStyle style="implicit"/>
 	<outlyingIntersections val="false"/>
 	<keepTypeOnTransform val="true"/>
@@ -143,12 +143,12 @@
 </element>
 <element type="vector" label="Vector" default="30">
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="1" speed="1" type="0" playing="false"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
 	<coordStyle style="cartesian"/>
 	<coords x="NaN" y="NaN" z="NaN"/>
 </element>
@@ -162,9 +162,9 @@
 	<animation step="1" speed="1" type="0" playing="false"/>
 </element>
 <element type="polyline" label="Polyline" default="71">
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="false"/>
 	<labelMode val="4"/>
@@ -174,12 +174,12 @@
 </element>
 <element type="conic" label="Conic" default="40">
 	<show object="true" label="true"/>
-	<objColor r="110" g="109" b="115" alpha="0"/>
+	<objColor r="0" g="0" b="0" alpha="0"/>
 	<layer val="0"/>
 	<autocolor val="false"/>
 	<labelMode val="4"/>
 	<animation step="0.1" speed="1" type="0" playing="false"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
 	<eqnStyle style="implicit"/>
 	<eigenvectors x0="1" y0="0" z0="1.0" x1="0" y1="1" z1="1.0"/>
 	<matrix A0="0" A1="0" A2="0" A3="0" A4="0" A5="0"/>
@@ -207,10 +207,10 @@
 	<animation speed="1" type="0" playing="false"/>
 </element>
 <element type="angle" label="Angle" default="52">
-	<angleStyle val="1"/>
+	<angleStyle val="0"/>
 	<value val="0"/>
-	<slider min="0" max="3.141592653589793" absoluteScreenLocation="true" width="180" fixed="true" horizontal="true" showAlgebra="false"/>
-	<lineStyle thickness="4" type="0" typeHidden="2" opacity="153"/>
+	<slider min="0" max="6.283185307179586" absoluteScreenLocation="true" width="180" fixed="true" horizontal="true" showAlgebra="false"/>
+	<lineStyle thickness="5" type="0" typeHidden="2" opacity="153"/>
 	<arcSize val="30"/>
 	<objColor r="0" g="0" b="0" alpha="0.10000000149011612"/>
 	<autocolor val="false"/>
@@ -223,7 +223,7 @@
 	<autocolor val="true"/>
 	<labelMode val="4"/>
 	<fixed val="true"/>
-	<lineStyle thickness="5" type="0" typeHidden="1" opacity="178"/>
+	<lineStyle thickness="5" type="0" typeHidden="1" opacity="204"/>
 </element>
 <element type="locus" label="Locus" default="80">
 	<show object="true" label="false"/>

@@ -9,7 +9,7 @@ from Problem import *
 from matplotlib import pyplot as plt
 import time, datetime
 
-problem_name = "problem6"
+problem_name = "usamo_2023_p1_rabbit"
 
 # parse info from .ggb through Read_in_Geogebra_File.py
 points_dict, lines, circles = parse_picture(f"{problem_name}.ggb")

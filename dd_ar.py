@@ -1,5 +1,8 @@
 import math
 import itertools
+import os
+import html
+from datetime import datetime
 from relations import *
 from Problem import Problem
 from typing import List, Tuple, Optional
@@ -31,34 +34,143 @@ class DDWithAR:
             self.congAPBP_congAQBQ__perpABPQ
         ]
 
-    def print_table(self, table):
-        if not table.rows:
-            print("  (empty)")
-            print()
-            return
+    # def print_table(self, table):
+    #     if not table.rows:
+    #         print("  (empty)")
+    #         print()
+    #         return
 
-        header_indices = "         " + "".join(f"     [{i:1d}]" for i in range(len(table.header)))
-        segment_names = []
+    #     header_indices = "         " + "".join(f"     [{i:1d}]" for i in range(len(table.header)))
+    #     segment_names = []
+    #     for col in table.header:
+    #         if isinstance(col, frozenset):
+    #             name = "{" + ", ".join(sorted(str(x) for x in col)) + "}"
+    #         else:
+    #             name = str(col)
+    #         segment_names.append(f"{name:>8}")
+    #     header_names = "          " + "".join(segment_names)
+        
+    #     print(header_indices)
+    #     print(header_names)
+    #     print("  " + "-" * (len(header_indices) - 2))
+
+    #     row_index = 0
+    #     for relation, row_list in table.rows.items():
+    #         for row in row_list:
+    #             row_str = "  Row " + f"{row_index}: " + "".join(f"{val:8.2f}" if abs(val) > 1e-10 else "    0.00" for val in row)
+    #             row_str += f"  # {relation}"
+    #             print(row_str)
+    #             row_index += 1
+    #     print()
+
+    def render_table_html(self, table) -> str:
+        """Return an HTML fragment rendering `table` as a labeled HTML table."""
+        if not table.rows:
+            return "<p><em>(empty)</em></p>\n"
+
+        # header labels (clearly show what each column is)
+        header_cells = []
         for col in table.header:
             if isinstance(col, frozenset):
+                # show set-of-points nicely
                 name = "{" + ", ".join(sorted(str(x) for x in col)) + "}"
             else:
                 name = str(col)
-            segment_names.append(f"{name:>8}")
-        header_names = "          " + "".join(segment_names)
-        
-        print(header_indices)
-        print(header_names)
-        print("  " + "-" * (len(header_indices) - 2))
+            header_cells.append(html.escape(name))
 
+        # build rows
+        rows_html = []
         row_index = 0
         for relation, row_list in table.rows.items():
+            rel_text = html.escape(str(relation))
             for row in row_list:
-                row_str = "  Row " + f"{row_index}: " + "".join(f"{val:8.2f}" if abs(val) > 1e-10 else "    0.00" for val in row)
-                row_str += f"  # {relation}"
-                print(row_str)
+                # Add row index as first column to make cross-referencing easy
+                cells = [f"<td>{row_index}</td>"]
+                for val in row:
+                    if abs(val) > 1e-10:
+                        cells.append(f"<td style='text-align:right'>{val:8.4g}</td>")
+                    else:
+                        cells.append(f"<td style='text-align:right'>0.00</td>")
+                cells.append(f"<td>{rel_text}</td>")
+                rows_html.append("<tr>" + "".join(cells) + "</tr>")
                 row_index += 1
-        print()
+
+        # assemble table HTML with a header that labels each column
+        header_html = "<th>Row</th>" + "".join(f"<th>{h}</th>" for h in header_cells) + "<th>Relation</th>"
+        table_html = f"""
+        <table class="ar-table">
+          <thead><tr>{header_html}</tr></thead>
+          <tbody>
+            {"".join(rows_html)}
+          </tbody>
+        </table>
+        """
+        return table_html
+
+    def _write_html_file(self, filename: str, fragment: str, mode: str = "w"):
+        """Write a full HTML document (mode='w') or append fragment into existing file body (mode='a')."""
+        HTML_HEAD = """<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>AR Tables</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin: 20px; color: #222;}
+h1,h2 { color: #333; }
+.ar-table { border-collapse: collapse; width: 100%; margin-bottom: 1.5rem; font-size: 0.9rem; }
+.ar-table th, .ar-table td { border: 1px solid #ddd; padding: 6px 8px; }
+.ar-table thead th { background: #f5f7fa; text-align: left; }
+.ar-table tbody tr:nth-child(even) { background: #fbfbfb; }
+.ar-table td { font-family: monospace; }
+.section { margin-bottom: 1.2rem; padding-bottom: 0.8rem; border-bottom: 1px solid #eee; }
+.timestamp { font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; }
+</style>
+</head>
+<body>
+"""
+        HTML_FOOT = """
+</body>
+</html>
+"""
+        # If mode is 'w' or file doesn't exist, write full document.
+        if mode == "w" or not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(HTML_HEAD)
+                f.write(fragment)
+                f.write(HTML_FOOT)
+        else:
+            # append fragment before closing </body>
+            with open(filename, "r", encoding="utf-8") as f:
+                content = f.read()
+            insert_at = content.rfind("</body>")
+            if insert_at == -1:
+                content = content + fragment
+            else:
+                content = content[:insert_at] + fragment + content[insert_at:]
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(content)
+
+    def dump_AR_tables_html(self, filename: str = "ar_tables.html", mode: str = "w", title: str = None):
+        """
+        Write Angle / Ratio / Area tables to an HTML file.
+        - filename: path to write (defaults to repo root working dir).
+        - mode: "w" to overwrite (default), "a" to append a new section.
+        - title: optional heading inserted above the tables (e.g., "Initial tables").
+        """
+        now = datetime.now().isoformat()
+        title_html = f"<h2>{html.escape(title)}</h2>\n" if title else ""
+        timestamp = f"<div class='timestamp'>Generated: {html.escape(now)}</div>\n"
+
+        fragment = f"<div class='section'>{title_html}{timestamp}"
+        fragment += "<h3>Angle Table</h3>\n"
+        fragment += self.render_table_html(self.angle_table)
+        fragment += "<h3>Ratio Table</h3>\n"
+        fragment += self.render_table_html(self.ratio_table)
+        fragment += "<h3>Area Table</h3>\n"
+        fragment += self.render_table_html(self.area_table)
+        fragment += "</div>\n"
+
+        self._write_html_file(filename, fragment, mode=mode)
 
     def apply_deduction_rules(self, max_iterations: int) -> bool:
         # initialize all the names of the angles and segments into the angle table and ratio table
@@ -85,12 +197,13 @@ class DDWithAR:
         for area in self.problem.relations.get("eqarea", []):
             self.area_table.add_eqarea(area)
 
-        print("Initial Angle Table:")
-        self.print_table(self.angle_table)
-        print("Initial Ratio Table:")
-        self.print_table(self.ratio_table)
-        print("Initial Area Table:")
-        self.print_table(self.area_table)
+        # print("Initial Angle Table:")
+        # self.print_table(self.angle_table)
+        # print("Initial Ratio Table:")
+        # self.print_table(self.ratio_table)
+        # print("Initial Area Table:")
+        # self.print_table(self.area_table)
+        self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
@@ -112,23 +225,25 @@ class DDWithAR:
                             self.update_AR_tables_with_relation(equiv_rel)
 
             if not progress_made:
-                print(f"No new relations in iteration {iteration}. Stopping.")
-                print("Final Angle Table:")
-                self.print_table(self.angle_table)
-                print("Final Ratio Table:")
-                self.print_table(self.ratio_table)
-                print("Final Area Table:")
-                self.print_table(self.area_table)
+                # print(f"No new relations in iteration {iteration}. Stopping.")
+                # print("Final Angle Table:")
+                # self.print_table(self.angle_table)
+                # print("Final Ratio Table:")
+                # self.print_table(self.ratio_table)
+                # print("Final Area Table:")
+                # self.print_table(self.area_table)
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 break
                 
             if self.problem.is_solved():
                 print(f"Problem solved in iteration {iteration}!")
-                print("Final Angle Table:")
-                self.print_table(self.angle_table)
-                print("Final Ratio Table:")
-                self.print_table(self.ratio_table)
-                print("Final Area Table:")
-                self.print_table(self.area_table)
+                # print("Final Angle Table:")
+                # self.print_table(self.angle_table)
+                # print("Final Ratio Table:")
+                # self.print_table(self.ratio_table)
+                # print("Final Area Table:")
+                # self.print_table(self.area_table)
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
             
             for goal in self.problem.remaining_goals:
@@ -944,7 +1059,8 @@ class DDWithAR:
                         p3, p2, p4, p3, p1, p,
                         parents={circle},
                         rule="circleOABC_midpMBC__eqangleBACBOM"
-                    )).append(EqualAngle(
+                    ))
+                    new_relations.append(EqualAngle(
                         p4, p2, p3, p4, p1, p,
                         parents={circle},
                         rule="circleOABC_midpMBC__eqangleCABCOM"
@@ -956,7 +1072,8 @@ class DDWithAR:
                         p2, p3, p4, p2, p1, p,
                         parents={circle},
                         rule="circleOABC_midpMBC__eqangleBACBOM"
-                    )).append(EqualAngle(
+                    ))
+                    new_relations.append(EqualAngle(
                         p4, p3, p2, p4, p1, p,
                         parents={circle},
                         rule="circleOABC_midpMBC__eqangleCABCOM"
@@ -968,7 +1085,8 @@ class DDWithAR:
                         p2, p4, p3, p2, p1, p,
                         parents={circle},
                         rule="circleOABC_midpMBC__eqangleBACBOM"
-                    )).append(EqualAngle(
+                    ))
+                    new_relations.append(EqualAngle(
                         p3, p4, p2, p3, p1, p,
                         parents={circle},
                         rule="circleOABC_midpMBC__eqangleCABCOM"

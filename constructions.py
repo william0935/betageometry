@@ -9,6 +9,10 @@ plt.style.use("seaborn-v0_8-whitegrid")  # clean white background
 
 class ConstructionPlotter:
     counter = 1
+    midpoint_counter = 1
+    incenter_counter = 1
+    orthocenter_counter = 1
+    circumcenter_counter = 1
     plotted_auxillaries = {} # these plotted auxillary points will be of the form X_N for some integer N
 
 
@@ -40,18 +44,24 @@ class ConstructionPlotter:
 
     def plot_newcircle(self, ax, center: Point, point: Point):
         theta = np.linspace(0, 2 * np.pi, 400)
-        r = math.dist(np.array([center.x, center.y]), np.array([point.x, point.y]))
+        # use tuples for math.dist (works with sequences)
+        r = math.dist((center.x, center.y), (point.x, point.y))
         x_coords = center.x + r * np.cos(theta)
         y_coords = center.y + r * np.sin(theta)
         ax.plot(x_coords, y_coords, color='black', lw=1.0, alpha=0.9)
-        ax.text(center.x, center.y, center.name, fontsize=9, color='black', ha='center', va='center')
+
+        # Plot the center as a visible point and label it (slight offset)
+        ax.plot(center.x, center.y, 'o', color='black', markersize=7, zorder=5)
+        ax.text(center.x + 0.05, center.y + 0.05, center.name, fontsize=10, color='black', weight='bold')
         
-    def plot_midpoint(self, ax, name: str, a: Point, b: Point):
+    def plot_midpoint(self, ax, dd_obj: DDWithAR, a: Point, b: Point):
         new_x = (a.x + b.x) / 2
         new_y = (a.y + b.y) / 2
-        X = Point(new_x, new_y)
+        X = Point(f"M{self.midpoint_counter}", new_x, new_y)
         ax.plot(new_x, new_y, 'o', color='black', markersize=6, zorder=5)
-        ax.text(new_x + 0.05, new_y + 0.05, name, fontsize=9, color='black', weight='bold')
+        ax.text(new_x + 0.05, new_y + 0.05, X.name, fontsize=9, color='black', weight='bold')
+        self.plot_newline(ax, a, b)
+        self.midpoint_counter += 1
         return X
 
 
@@ -65,21 +75,26 @@ class ConstructionPlotter:
         bisector_dir = (BA_norm + BC_norm) / np.linalg.norm(BA_norm + BC_norm)
         start_point = B - bisector_dir * 100
         end_point = B + bisector_dir * 100
-        X = self.find_intersection(start_point, end_point, a, c)
+        X = self.find_intersection(a, c, start_point, end_point)
+        self.counter -= 1
         ax.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]],
                 color='black', lw=1.0, linestyle='--', alpha=0.9)
         ax.plot(X.x, X.y, 'o', color='black', markersize=7, zorder=5)
-        ax.text(X.x + 0.05, X.y + 0.05, "X", fontsize=10, color='black', weight='bold')
+        ax.text(X.x + 0.05, X.y + 0.05, f"X{self.counter}", fontsize=10, color='black', weight='bold')
+        self.plot_newline(ax, a, b)
+        self.plot_newline(ax, b, c)
+        self.plot_newline(ax, a, c)
         new_relations = [EqualAngle(a, b, X, X, b, c), Collinear(a, c, X)]
         a_name = a.name
         b_name = b.name
         c_name = c.name
-        dd_obj.angle_table.add_col(a_name + "X")
-        dd_obj.angle_table.add_col(b_name + "X")
-        dd_obj.angle_table.add_col(c_name + "X")
+        dd_obj.angle_table.add_col(a_name + f"X{self.counter}")
+        dd_obj.angle_table.add_col(b_name + f"X{self.counter}")
+        dd_obj.angle_table.add_col(c_name + f"X{self.counter}")
         for relation in new_relations:
             dd_obj.update_AR_tables_with_relation(relation)
-        return new_relations
+        self.counter += 1
+        return X
 
 
     def plot_perp(self, ax, dd_obj: DDWithAR, a: Point, b: Point, pt_from: Point):
@@ -90,93 +105,163 @@ class ConstructionPlotter:
         start_point = np.array([pt_from.x, pt_from.y]) - perp * 100
         end_point = np.array([pt_from.x, pt_from.y]) + perp * 100
         X = self.find_intersection(a, b, start_point, end_point)
+        self.counter -= 1
         new_relations = [Perpendicular(pt_from, X, a, b), Collinear(X, a, b)]
         a_name = a.name
         b_name = b.name
         pt_from_name = pt_from.name
-        dd_obj.angle_table.add_col(a.name + "X")
-        dd_obj.angle_table.add_col(b.name + "X")
+        dd_obj.angle_table.add_col(a.name + f"X{self.counter}")
+        dd_obj.angle_table.add_col(b.name + f"X{self.counter}")
         for relation in new_relations:
             dd_obj.update_AR_tables_with_relation(relation)
         ax.plot([start_point[0], end_point[0]], [start_point[1], end_point[1]],
                 color='black', lw=1.0, linestyle=':', alpha=0.9)
-        return new_relations
+        self.counter += 1
+        return X
         
     def circumcenter(self, ax, dd_obj: DDWithAR, A: Point, B: Point, C: Point):
-        # find using perp bisectors of 2 sides intersecting
-        midp_AB_x = (A.x + B.x) / 2
-        midp_AB_y = (A.y + B.y) / 2
-        midp_AB = Point(midp_AB_x, midp_AB_y)
-        midp_BC_x = (B.x + C.x) / 2
-        midp_BC_y = (B.y + C.y) / 2
-        midp_BC = Point(midp_BC_x, midp_BC_y)
-        a, b = np.array([A.x, A.y]), np.array([B.x, B.y])
+        """Find circumcenter as intersection of perpendicular bisectors of AB and BC."""
+        # points as numpy arrays
+        a = np.array([A.x, A.y], dtype=float)
+        b = np.array([B.x, B.y], dtype=float)
+        c = np.array([C.x, C.y], dtype=float)
+
+        # midpoints as numpy arrays
+        mid_AB = (a + b) / 2.0
+        mid_BC = (b + c) / 2.0
+
+        # perpendicular direction for AB
         ab = a - b
-        perp = np.array([-ab[1], ab[0]])
-        perp /= np.linalg.norm(perp)
-        AB_start_point = np.array([midp_AB.x, midp_AB.y]) - perp * 100
-        AB_end_point = np.array([midp_AB.x, midp_AB.y]) + perp * 100
-        b, c = np.array([B.x, B.y]), np.array([C.x, C.y])
+        perp_ab = np.array([-ab[1], ab[0]], dtype=float)
+        perp_ab /= np.linalg.norm(perp_ab)
+
+        # perpendicular direction for BC
         bc = b - c
-        perp = np.array([-bc[1], bc[0]])
-        perp /= np.llinalg.norm(perp)
-        BC_start_point = np.array([midp_BC.x, midp_BC.y]) - perp * 100
-        BC_end_point = np.array([midp_BC.x, midp_BC.y]) + perp * 100
-        X = self.find_intersection(AB_start_point, AB_end_point, BC_start_point, BC_end_point)
-        new_relations = [Circle(X, A, B, C), Congruent(X, A, X, B), Congruent(X, A, X, C)]
+        perp_bc = np.array([-bc[1], bc[0]], dtype=float)
+        perp_bc /= np.linalg.norm(perp_bc)
+
+        # visual ray length (tweak if you want shorter/longer)
+        length = 100.0
+
+        AB_start_point = mid_AB - perp_ab * length
+        AB_end_point   = mid_AB + perp_ab * length
+        BC_start_point = mid_BC - perp_bc * length
+        BC_end_point   = mid_BC + perp_bc * length
+
+        # find intersection (find_intersection accepts array-like or Points)
+        O = self.find_intersection(AB_start_point, AB_end_point, BC_start_point, BC_end_point)
+        self.counter -= 1
+
+        new_relations = [Circle(O, A, B, C), Congruent(O, A, O, B), Congruent(O, A, O, C)]
+
         A_name = A.name
         B_name = B.name
         C_name = C.name
-        dd_obj.angle_table.add_col(A_name + "X")
-        dd_obj.angle_table.add_col(B_name + "X")
-        dd_obj.angle_table.add_col(C_name + "X")
+        dd_obj.angle_table.add_col(A_name + f"O{self.circumcenter_counter}")
+        dd_obj.angle_table.add_col(B_name + f"O{self.circumcenter_counter}")
+        dd_obj.angle_table.add_col(C_name + f"O{self.circumcenter_counter}")
         for relation in new_relations:
             dd_obj.update_AR_tables_with_relation(relation)
-        self.plot_newcircle(ax, X, A)
-        return new_relations
+
+        # draw circle and update counter
+        self.plot_newcircle(ax, O, A)
+        self.circumcenter_counter += 1
+        return O
 
     def incenter(self, ax, dd_obj: DDWithAR, A: Point, B: Point, C: Point):
-        # find the intersection of 2 angle bisectors
-        a, b, c = np.array([A.x, A.y]), np.array([B.x, B.y]), np.array([C.x, C.y])
-        ba, bc = a - b, c - b
-        BA_norm = ba / np.linalg.norm(ba)
-        BC_norm = bc / np.linalg.norm(bc)
-        bisector_dir = (BA_norm + BC_norm) / np.linalg.norm(BA_norm + BC_norm)
-        B_start_point = B - bisector_dir * 100
-        B_end_point = B + bisector_dir * 100
-        ac = c - a
-        AC_norm = ac / np.linalg.norm(ac)
-        bisector_dir = (BA_norm + AC_norm) / np.linalg.norm(BA_norm + AC_norm)
-        A_start_point = A - bisector_dir * 100
-        A_end_point = A + bisector_dir * 100
-        I = self.find_intersection(A_start_point, A_end_point, B_start_point, B_end_point)
-        new_relations = [EqualAngle(A, B, I, I, B, C), EqualAngle(B, C, I, I, C, A),
-                        EqualAngle(C, A, I, I, A, B)]
+        """
+        Compute and plot the incenter (intersection of internal angle bisectors).
+        Returns a list of the EqualAngle relations (same shape as other construction methods).
+        """
+
+        # convert to numpy arrays (vectors)
+        a = np.array([A.x, A.y], dtype=float)
+        b = np.array([B.x, B.y], dtype=float)
+        c = np.array([C.x, C.y], dtype=float)
+
+        # Bisector at A: use vectors AB and AC (both originate at A)
+        AB = b - a
+        AC = c - a
+        ABn = AB / np.linalg.norm(AB)
+        ACn = AC / np.linalg.norm(AC)
+        bisector_dir_A = (ABn + ACn)
+        bisector_dir_A /= np.linalg.norm(bisector_dir_A)
+
+        # Bisector at B: use vectors BA and BC (both originate at B)
+        BA = a - b
+        BC = c - b
+        BAn = BA / np.linalg.norm(BA)
+        BCn = BC / np.linalg.norm(BC)
+        bisector_dir_B = (BAn + BCn)
+        bisector_dir_B /= np.linalg.norm(bisector_dir_B)
+
+        # visual ray length (you can compute from ax.get_xlim()/get_ylim() if you prefer)
+        length = 100.0
+        A_start = a - bisector_dir_A * length
+        A_end   = a + bisector_dir_A * length
+        B_start = b - bisector_dir_B * length
+        B_end   = b + bisector_dir_B * length
+
+        # find intersection (works with array-like)
+        I = self.find_intersection(A_start, A_end, B_start, B_end)
+
+        # build relations (same format you used before)
+        new_relations = [
+            EqualAngle(A, B, I, I, B, C),
+            EqualAngle(B, C, I, I, C, A),
+            EqualAngle(C, A, I, I, A, B)
+        ]
+
+        # update angle-table columns
         A_name = A.name
         B_name = B.name
         C_name = C.name
-        dd_obj.angle_table.add_col(A_name + "I")
-        dd_obj.angle_table.add_col(B_name + "I")
-        dd_obj.angle_table.add_col(C_name + "I")
+        dd_obj.angle_table.add_col(A_name + f"I{self.incenter_counter}")
+        dd_obj.angle_table.add_col(B_name + f"I{self.incenter_counter}")
+        dd_obj.angle_table.add_col(C_name + f"I{self.incenter_counter}")
         for relation in new_relations:
             dd_obj.update_AR_tables_with_relation(relation)
+
+        # plot the incenter and connecting lines
         self.plot_newpoint(ax, I)
         self.plot_newline(ax, I, A)
         self.plot_newline(ax, I, B)
         self.plot_newline(ax, I, C)
+
+        self.incenter_counter += 1
         return new_relations
 
-    def find_intersection(self, a: Point, b: Point, c: Point, d: Point):
-        m1 = (a.y-b.y)/(a.x-b.x)
-        m2 = (c.y-d.y)/(c.x-d.x)
-        c1 = a.y - m1*a.x
-        c2 = c.y - m2*c.x
-        x_x = (c1-c2)/(m2-m1)
-        x_y = x_x*m1 + c1
+    def find_intersection(self, a, b, c, d):
+        def _to_xy(p):
+            if hasattr(p, "x") and hasattr(p, "y"):
+                return float(p.x), float(p.y)
+            arr = np.asarray(p, dtype=float)
+            return float(arr[0]), float(arr[1])
+
+        x1, y1 = _to_xy(a)
+        x2, y2 = _to_xy(b)
+        x3, y3 = _to_xy(c)
+        x4, y4 = _to_xy(d)
+
+        # Line coefficients for form: A*x + B*y = C
+        A1 = y2 - y1
+        B1 = x1 - x2
+        C1 = A1 * x1 + B1 * y1
+
+        A2 = y4 - y3
+        B2 = x3 - x4
+        C2 = A2 * x3 + B2 * y3
+
+        det = A1 * B2 - A2 * B1
+        if abs(det) < 1e-12:
+            raise ValueError("Lines are parallel or nearly parallel; no unique intersection.")
+
+        x_x = (C1 * B2 - B1 * C2) / det
+        x_y = (A1 * C2 - C1 * A2) / det
+
         X = Point(f"X{self.counter}", x_x, x_y)
         self.counter += 1
         return X
-
 
     def setup_geometry_plot(self, square: bool = True):
         fig, ax = plt.subplots(figsize=(8, 8))

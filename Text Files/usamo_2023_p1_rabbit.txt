@@ -1,1 +1,1 @@
-circle O A B P; circle O A B Q; midp M B C; perp P C A M; midp N A Q; perp A X B C; ? cong N B N C
+circle O A B P; circle O A B Q; midp M B C; perp P C A M; col A P M; col B Q C; midp N A Q; perp A X B C; col B X C; col Q M X; ? cong N B N C

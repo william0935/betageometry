@@ -172,7 +172,7 @@ h1,h2 { color: #333; }
 
         self._write_html_file(filename, fragment, mode=mode)
 
-    def apply_deduction_rules(self, max_iterations: int) -> bool:
+    def apply_deduction_rules(self, max_iterations: int, save_AR_tables: bool) -> bool:
         # initialize all the names of the angles and segments into the angle table and ratio table
         for point1, point2 in itertools.combinations(self.problem.points, 2):
             segment = frozenset({point1, point2})
@@ -203,7 +203,8 @@ h1,h2 { color: #333; }
         # self.print_table(self.ratio_table)
         # print("Initial Area Table:")
         # self.print_table(self.area_table)
-        self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
+        if save_AR_tables:
+            self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
@@ -225,25 +226,15 @@ h1,h2 { color: #333; }
                             self.update_AR_tables_with_relation(equiv_rel)
 
             if not progress_made:
-                # print(f"No new relations in iteration {iteration}. Stopping.")
-                # print("Final Angle Table:")
-                # self.print_table(self.angle_table)
-                # print("Final Ratio Table:")
-                # self.print_table(self.ratio_table)
-                # print("Final Area Table:")
-                # self.print_table(self.area_table)
-                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                print(f"No new relations in iteration {iteration}. Stopping.")
+                if save_AR_tables:
+                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 break
                 
             if self.problem.is_solved():
                 print(f"Problem solved in iteration {iteration}!")
-                # print("Final Angle Table:")
-                # self.print_table(self.angle_table)
-                # print("Final Ratio Table:")
-                # self.print_table(self.ratio_table)
-                # print("Final Area Table:")
-                # self.print_table(self.area_table)
-                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                if save_AR_tables:
+                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
             
             for goal in self.problem.remaining_goals:
@@ -1342,12 +1333,21 @@ h1,h2 { color: #333; }
         row2 = [0] * self.angle_table.table_length()
         row2[self.angle_table.col_id[frozenset({p1, p2})]] += 1
         row2[self.angle_table.col_id[frozenset({p1, p3})]] += -1
+        row3 = [0] * self.angle_table.table_length()
+        row3[self.angle_table.col_id[frozenset({p2, p3})]] += 1
+        row3[self.angle_table.col_id[frozenset({p1, p3})]] += -1
         
         is_spanned1, parents1 = self.angle_table.is_spanned(row1)
         is_spanned2, parents2 = self.angle_table.is_spanned(row2)
-        if is_spanned1 and is_spanned2:
-            return True, parents1 | parents2
-        return False, set()
+        is_spanned3, parents3 = self.angle_table.is_spanned(row3)
+        if is_spanned1:
+            return True, parents1
+        elif is_spanned2:
+            return True, parents2
+        elif is_spanned3:
+            return True, parents3
+        else:
+            return False, set()
 
     def are_points_parallel(self, p1: Point, p2: Point, p3: Point, p4: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if two lines (p1,p2) and (p3,p4) are parallel via the AngleTable."""

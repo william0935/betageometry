@@ -22,7 +22,8 @@ class Problem:
         self.deduction_steps = []
         self.similar_triangle_pairs = self.find_similar_triangle_pairs()
         self.cyclic_quads = self.find_cyclic_quads()
-        print(self.cyclic_quads)
+        # print(self.similar_triangle_pairs)
+        # print(self.cyclic_quads)
         for r in self.assumptions:
             r.add_index(self.index_counter)
             self.index_counter += 1
@@ -140,6 +141,8 @@ class Problem:
             for p4, p5, p6 in permutations(points, 3):
                 if p1 == p4 and p2 == p5 and p3 == p6:
                     continue
+                if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol:
+                    continue
                 if abs(self.angle_value(p1, p2, p3) - self.angle_value(p4, p5, p6)) < tol and \
                    abs(self.angle_value(p2, p3, p1) - self.angle_value(p5, p6, p4)) < tol and \
                    abs(self.angle_value(p3, p1, p2) - self.angle_value(p6, p4, p5)) < tol:
@@ -153,6 +156,8 @@ class Problem:
         for p1, p2 in combinations(points, 2):
             for p3, p4 in permutations(points, 2):
                 if len({p1, p2, p3, p4}) < 4:
+                    continue
+                if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol:
                     continue
                 angle1 = self.angle_value(p1, p3, p2)
                 angle2 = self.angle_value(p1, p4, p2)

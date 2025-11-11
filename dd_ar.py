@@ -7,6 +7,7 @@ from relations import *
 from Problem import Problem
 from typing import List, Tuple, Optional
 from ar import *
+from Constructions import *
 
 class DDWithAR:    
     def __init__(self, problem: Problem):
@@ -172,7 +173,36 @@ h1,h2 { color: #333; }
 
         self._write_html_file(filename, fragment, mode=mode)
 
-    def apply_deduction_rules(self, max_iterations: int, save_AR_tables: bool) -> bool:
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def add_constructed_point(self, point: Point, canva: Canva):
+        pass
+
+    def add_constructed_relation(self, relation: RelationNode, canva: Canva):
+        pass
+
+
+
+
+
+
+
+
+
+
+
+    def apply_deduction_rules(self, max_iterations: int, canva: Canva) -> bool:
         # initialize all the names of the angles and segments into the angle table and ratio table
         for point1, point2 in itertools.combinations(self.problem.points, 2):
             segment = frozenset({point1, point2})
@@ -197,14 +227,7 @@ h1,h2 { color: #333; }
         for area in self.problem.relations.get("eqarea", []):
             self.area_table.add_eqarea(area)
 
-        # print("Initial Angle Table:")
-        # self.print_table(self.angle_table)
-        # print("Initial Ratio Table:")
-        # self.print_table(self.ratio_table)
-        # print("Initial Area Table:")
-        # self.print_table(self.area_table)
-        if save_AR_tables:
-            self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
+        self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
@@ -226,15 +249,12 @@ h1,h2 { color: #333; }
                             self.update_AR_tables_with_relation(equiv_rel)
 
             if not progress_made:
-                print(f"No new relations in iteration {iteration}. Stopping.")
-                if save_AR_tables:
-                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 break
                 
             if self.problem.is_solved():
                 print(f"Problem solved in iteration {iteration}!")
-                if save_AR_tables:
-                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
             
             for goal in self.problem.remaining_goals:

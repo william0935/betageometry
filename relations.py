@@ -268,6 +268,7 @@ class CongruentTriangle1(RelationNode):
                 EqualAngle(p1, p2, p3, p4, p5, p6, parents=[self]),
                 EqualAngle(p2, p3, p1, p5, p6, p4, parents=[self]),
                 EqualAngle(p3, p1, p2, p6, p4, p5, parents=[self]),
+                EqArea(p1, p2, p3, p4, p5, p6, parents=[self]),
                 # Sameclock(p1, p2, p3, p4, p5, p6, parents=[self])
             ]
         )
@@ -299,6 +300,7 @@ class CongruentTriangle2(RelationNode):
                 EqualAngle(p1, p2, p3, p6, p5, p4, parents=[self]),
                 EqualAngle(p2, p3, p1, p4, p6, p5, parents=[self]),
                 EqualAngle(p3, p1, p2, p5, p4, p6, parents=[self]),
+                EqArea(p1, p2, p3, p4, p5, p6, parents=[self]),
                 # Sameclock(p1, p2, p3, p6, p5, p4, parents=[self])
             ]
         )
@@ -375,13 +377,11 @@ class EqArea(RelationNode):
         super().__init__(
             name="eqarea",
             index=index,
-            relation=(frozenset({p1, p2}), frozenset({p3, p4})),
+            relation=(frozenset({p1, p2, p3}), frozenset({p4, p5, p6})),
             representation=f"eqarea {p1} {p2} {p3} {p4} {p5} {p6}",
             parents=parents,
             rule=rule,
-            equivalent=[
-                # idk what to put here yet
-            ]
+            equivalent=[]
         )
 
         self.points = [p1, p2, p3, p4, p5, p6]

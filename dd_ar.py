@@ -32,7 +32,8 @@ class DDWithAR:
             self.eqratioDBDCABAC_colDBC__eqangleBADDAC,
             self.eqangleBADDAC_colDBC__eqratioDBDCABAC,
             self.perpABBC_congMAMC_colMAC__congAMBM,
-            self.congAPBP_congAQBQ__perpABPQ
+            self.congAPBP_congAQBQ__perpABPQ,
+            self.check_collinearity
         ]
 
     # def print_table(self, table):
@@ -174,32 +175,28 @@ h1,h2 { color: #333; }
         self._write_html_file(filename, fragment, mode=mode)
 
 
+    def add_constructed_point(self, point: Point):
+        "add a constructed point to the problem and update AR tables"
+        points = self.problem.points
+        for existing_point in points:
+            if existing_point.name == point.name:
+                raise ValueError(f"Point with name {point.name} already exists in the problem.")
+            seg = frozenset({existing_point, point})
+            self.angle_table.add_col(seg)
+            self.ratio_table.add_col(seg)
+            self.area_table.add_col(seg)
+        points.append(point)
 
+        # TODO: this is extremely inefficient because it recalculates every single similar triangle/cyclic quad/collinear triple
+        # when adding a new point, rather than only checking for new ones that might involve the new point.
+        self.problem.similar_triangle_pairs = self.problem.find_similar_triangle_pairs()
+        self.problem.cyclic_quads = self.problem.find_cyclic_quads()
+        self.problem.collinear_triples = self.problem.find_collinear_triples()
 
-
-
-
-
-
-
-
-
-
-
-    def add_constructed_point(self, point: Point, canva: Canva):
-        pass
-
-    def add_constructed_relation(self, relation: RelationNode, canva: Canva):
-        pass
-
-
-
-
-
-
-
-
-
+    def add_constructed_relation(self, relation: RelationNode):
+        "add a constructed relation to the problem and update AR tables"
+        self.problem.add_relation(relation)
+        self.update_AR_tables_with_relation(relation)
 
 
     def apply_deduction_rules(self, max_iterations: int, canva: Canva) -> bool:
@@ -1229,6 +1226,20 @@ h1,h2 { color: #333; }
                         rule="congAPBP_congAQBQ__perpABPQ"
                     ))
             
+        return new_relations
+    
+    def check_collinearity(self) -> List[RelationNode]:
+        """Check for all three points that are collinear."""
+        new_relations = []
+        collinears = self.problem.collinear_triples
+        for p1, p2, p3 in collinears:
+            are_collinear, parents = self.are_points_collinear(p1, p2, p3)
+            if are_collinear:
+                new_relations.append(Collinear(
+                    p1, p2, p3,
+                    parents=parents,
+                    rule="check_collinear"
+                ))
         return new_relations
 
     """

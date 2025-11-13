@@ -22,6 +22,7 @@ class Problem:
         self.deduction_steps = []
         self.similar_triangle_pairs = self.find_similar_triangle_pairs()
         self.cyclic_quads = self.find_cyclic_quads()
+        self.collinear_triples = self.find_collinear_triples()
         # print(self.similar_triangle_pairs)
         # print(self.cyclic_quads)
         for r in self.assumptions:
@@ -164,6 +165,16 @@ class Problem:
                 if abs(angle1 + angle2 - 180) < tol or abs(angle1 - angle2) < tol:
                     quads.append((p1, p2, p3, p4))
         return quads
+    
+    def find_collinear_triples(self, tol=1e-5) -> List[Tuple[Point, Point, Point]]:
+        "find all possible collinear triples among the points according to the diagram"
+        points = self.points
+        triples = []
+        for p1, p2, p3 in combinations(points, 3):
+            area = abs(0.5 * (p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)))
+            if area < tol:
+                triples.append((p1, p2, p3))
+        return triples
 
     def angle_value(self, a: Point, b: Point, c: Point) -> float:
         "compute the angle value of angle ABC in degrees"

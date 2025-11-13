@@ -1,3 +1,9 @@
+# uv stuff
+*.toml
+uv.lock
+*.html
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

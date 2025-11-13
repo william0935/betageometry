@@ -5,6 +5,7 @@ from relations import *
 
 plt.style.use("seaborn-v0_8-whitegrid")  # clean white background
 
+
 class Canva:
     def __init__(self, points: List[RelationNode],
                  points_dict: Dict[str, Tuple[float, float]], 
@@ -41,6 +42,14 @@ class Canva:
         midp = Midpoint(p, a, b, rule="construction")
         return p, [midp]
     
+    def mirror(self, a: Point, b: Point) -> Tuple[Point, List[RelationNode]]:
+        # mirror point a across point b
+        x = 2 * b.x - a.x
+        y = 2 * b.y - a.y
+        p = self.add_point(x, y)
+        midp = Midpoint(b, a, p, rule="construction")
+        return p, [midp]
+
     def intersect_lines(self, a: Point, b: Point, c: Point, d: Point) -> Tuple[Point, List[RelationNode]]:
         if isinstance(a, np.ndarray):
             a = Point("temp_a", a[0], a[1])
@@ -74,13 +83,14 @@ class Canva:
         bisector_dir = (BA_norm + BC_norm) / np.linalg.norm(BA_norm + BC_norm)
         start_point = B - bisector_dir * 100
         end_point = B + bisector_dir * 100
-        X, relations = self.intersect_lines(start_point, end_point, a, c)
+        X, _ = self.intersect_lines(start_point, end_point, a, c)
         if X is None:
             return None, []
         eqangle = EqualAngle(a, b, X, X, b, c, rule="construction")
+        col = Collinear(a, c, X, rule="construction")
         line_name = f"Line_{b.name}{X.name}"
         self.lines[line_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * B[1] - bisector_dir[1] * B[0])
-        return X, relations + [eqangle]
+        return X, [eqangle, col]
 
     def foot(self, pt_from: Point, a: Point, b: Point) -> Tuple[Point, List[RelationNode]]:
         if is_collinear(pt_from, a, b):
@@ -91,7 +101,7 @@ class Canva:
         perp /= np.linalg.norm(perp)
         start_point = np.array([pt_from.x, pt_from.y]) - perp * 100
         end_point = np.array([pt_from.x, pt_from.y]) + perp * 100
-        X, relations = self.intersect_lines(start_point, end_point, a, b)
+        X, _ = self.intersect_lines(start_point, end_point, a, b)
         if X is None:
             return None, []
         perpendicular = Perpendicular(pt_from, X, a, b, rule="construction")
@@ -99,7 +109,7 @@ class Canva:
         line_name = f"Line_{pt_from.name}{X.name}"
         # use start and end points to define line equation
         self.lines[line_name] = (perp[1], -perp[0], perp[0] * start_point[1] - perp[1] * start_point[0])
-        return X, relations + [perpendicular, col]
+        return X, [perpendicular, col]
 
     def circle(self, a: Point, b: Point, c: Point) -> Tuple[Point, List[RelationNode]]:
         # find using perp bisectors of 2 sides intersecting
@@ -121,13 +131,13 @@ class Canva:
         perp /= np.linalg.norm(perp)
         BC_start_point = np.array([midp_BC_x, midp_BC_y]) - perp * 100
         BC_end_point = np.array([midp_BC_x, midp_BC_y]) + perp * 100
-        X, relations = self.intersect_lines(AB_start_point, AB_end_point, BC_start_point, BC_end_point)
+        X, _ = self.intersect_lines(AB_start_point, AB_end_point, BC_start_point, BC_end_point)
         if X is None:
             return None, []
         circle = Circle(X, a, b, c, rule="construction")
         circle_name = f"Circle_{X.name}{a.name}{b.name}{c.name}"
         self.circles[circle_name] = (X.x, X.y, np.sqrt((a.x - X.x)**2 + (a.y - X.y)**2))
-        return X, relations + [circle]
+        return X, [circle]
     
     def incenter(self, a: Point, b: Point, c: Point) -> Tuple[List[Point], List[RelationNode]]:
         # find the intersection of 2 angle bisectors
@@ -140,24 +150,32 @@ class Canva:
         bisector_dir = (BA_norm + BC_norm) / np.linalg.norm(BA_norm + BC_norm)
         B_start_point = B - bisector_dir * 100
         B_end_point = B + bisector_dir * 100
+        AB = B - A
         AC = C - A
+        AB_norm = AB / np.linalg.norm(AB)
         AC_norm = AC / np.linalg.norm(AC)
-        bisector_dir = (BA_norm + AC_norm) / np.linalg.norm(BA_norm + AC_norm)
+        bisector_dir = (AB_norm + AC_norm) / np.linalg.norm(AB_norm + AC_norm)
         A_start_point = A - bisector_dir * 100
         A_end_point = A + bisector_dir * 100
-        I, relations = self.intersect_lines(A_start_point, A_end_point, B_start_point, B_end_point)
+        I, _ = self.intersect_lines(A_start_point, A_end_point, B_start_point, B_end_point)
         X, rel1 = self.anglebisector(b, a, c)
         Y, rel2 = self.anglebisector(c, b, a)
         Z, rel3 = self.anglebisector(a, c, b)
-        relations += rel1 + rel2 + rel3
+        relations = rel1 + rel2 + rel3
         if I is None or X is None or Y is None or Z is None:
             return [], []
         eqangle1 = EqualAngle(a, b, I, I, b, c, rule="construction")
         eqangle2 = EqualAngle(b, c, I, I, c, a, rule="construction")
         eqangle3 = EqualAngle(c, a, I, I, a, b, rule="construction")
-        col1 = Collinear(a, b, Z, rule="construction")
-        col2 = Collinear(a, c, Y, rule="construction")
-        col3 = Collinear(b, c, X, rule="construction")
+        col1 = Collinear(a, I, X, rule="construction")
+        col2 = Collinear(b, I, Y, rule="construction")
+        col3 = Collinear(c, I, Z, rule="construction")
+        line1_name = f"Line_{a.name}{I.name}{X.name}"
+        line2_name = f"Line_{b.name}{I.name}{Y.name}"
+        line3_name = f"Line_{c.name}{I.name}{Z.name}"
+        self.lines[line1_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * A[1] - bisector_dir[1] * A[0])
+        self.lines[line2_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * B[1] - bisector_dir[1] * B[0])
+        self.lines[line3_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * C[1] - bisector_dir[1] * C[0])
         return [I, X, Y, Z], relations + [eqangle1, eqangle2, eqangle3, col1, col2, col3]
     
     def incenter2(self, a: Point, b: Point, c: Point) -> Tuple[List[Point], List[RelationNode]]:
@@ -179,142 +197,6 @@ class Canva:
         circle_name = f"Circle_{I.name}{X1.name}{Y1.name}{Z1.name}"
         self.circles[circle_name] = (I.x, I.y, np.sqrt((X1.x - I.x)**2 + (X1.y - I.y)**2))
         return [I, X, Y, Z, X1, Y1, Z1], relations + [perp1, perp2, perp3, circle, cong]
-    
-
-
-
-
-
-
-    # def circumcenter(ax, x_counter, dd_obj: DDWithAR, A: Point, B: Point, C: Point):
-    #     # find using perp bisectors of 2 sides intersecting
-    #     midp_AB_x = (A.x + B.x) / 2
-    #     midp_AB_y = (A.y + B.y) / 2
-    #     midp_AB = Point(midp_AB_x, midp_AB_y)
-    #     midp_BC_x = (B.x + C.x) / 2
-    #     midp_BC_y = (B.y + C.y) / 2
-    #     midp_BC = Point(midp_BC_x, midp_BC_y)
-    #     a, b = np.array([A.x, A.y]), np.array([B.x, B.y])
-    #     ab = a - b
-    #     perp = np.array([-ab[1], ab[0]])
-    #     perp /= np.linalg.norm(perp)
-    #     AB_start_point = np.array([midp_AB.x, midp_AB.y]) - perp * 100
-    #     AB_end_point = np.array([midp_AB.x, midp_AB.y]) + perp * 100
-    #     b, c = np.array([B.x, B.y]), np.array([C.x, C.y])
-    #     bc = b - c
-    #     perp = np.array([-bc[1], bc[0]])
-    #     perp /= np.llinalg.norm(perp)
-    #     BC_start_point = np.array([midp_BC.x, midp_BC.y]) - perp * 100
-    #     BC_end_point = np.array([midp_BC.x, midp_BC.y]) + perp * 100
-    #     X = find_intersection(AB_start_point, AB_end_point, BC_start_point, BC_end_point)
-    #     X.name = "X" + str(x_counter)
-    #     dd_obj.problem.points.append(X)
-    #     new_relations = [Circle(X, A, B, C), Congruent(X, A, X, B), Congruent(X, A, X, C)]
-    #     dd_obj.angle_table.add_col(A.name + X.name)
-    #     dd_obj.angle_table.add_col(B.name + X.name)
-    #     dd_obj.angle_table.add_col(C.name + X.name)
-    #     dd_obj.ratio_table.add_col(A.name + X.name)
-    #     dd_obj.ratio_table.add_col(B.name + X.name)
-    #     dd_obj.ratio_table.add_col(C.name + X.name)
-    #     for relation in new_relations:
-    #         dd_obj.problem.add_relation(relation)
-    #         dd_obj.update_AR_tables_with_relation(relation)
-    #     plot_newcircle(ax, X, A)
-    #     plot_newpoint(ax, X)
-    #     return X
-
-    # def excenter(ax, j_counter, dd_obj: DDWithAR, A: Point, B: Point, C: Point):
-    #     X = anglebisector(ax, 0, dd_obj, B, A, C)
-    #     a, b = np.array([A.x, A.y]), np.array([B.x, B.y])
-    #     AB = b - a
-    #     AB_norm = AB / np.linalg.norm(AB)
-    #     AB_extended = b + AB_norm * 100
-    #     extend_AB = Point("ABextension", AB_extended[0], AB_extended[1])
-    #     Y = anglebisector(ax, 0, dd_obj, extend_AB, B, C)
-    #     J  = find_intersection(A, X, B, Y)
-    #     J.name = "J" + str(j_counter)
-    #     dd_obj.problem.points.append(J)
-    #     new_relations = [EqualAngle(B, A, J, J, A, C)]
-    #     dd_obj.angle_table.add_col(A.name + J.name)
-    #     for relation in new_relations:
-    #         dd_obj.update_AR_tables_with_relation(relation)
-    #         dd_obj.problem.add_relation(relation)
-    #     plot_newpoint(ax, J)
-    #     return J
-
-    # def excenter2(ax, x_counter, y_counter, z_counter, j_counter, dd_obj: DDWithAR, A: Point, B: Point, C: Point):
-    #     J = excenter(ax, j_counter, dd_obj, A, B, C)
-    #     X = perp(ax, x_counter, dd_obj, B, C, J)
-    #     Y = perp(ax, y_counter, dd_obj, A, C, J)
-    #     Z = perp(ax, z_counter, dd_obj, A, B, J)
-    #     dd_obj.problem.points.extend([X, Y, Z, J])
-    #     new_relations = [EqualAngle(B, A, J, J, A, C), EqualAngle(X, B, J, J, B, Z),
-    #                     EqualAngle(X, C, J, J, C, Y), EqualAngle(J, X, Y, Z),
-    #                     Congruent(J, X, J, Y), Congruent(J, X, J, Z), Perpendicular(B, C, X, J),
-    #                     Perpendicular(A, C, Y, J), Perpendicular(A, B, Z, J)]
-    #     dd_obj.angle_table.add_col(A.name + J.name)
-    #     dd_obj.angle_table.add_col(B.name + J.name)
-    #     dd_obj.angle_table.add_col(C.name + J.name)
-    #     dd_obj.angle_table.add_col(X.name + B.name)
-    #     dd_obj.angle_table.add_col(X.name + C.name)
-    #     dd_obj.angle_table.add_col(X.name + J.name)
-    #     dd_obj.angle_table.add_col(Y.name + C.name)
-    #     dd_obj.angle_table.add_col(Y.name + J.name)
-    #     dd_obj.angle_table.add_col(Z.name + B.name)
-    #     dd_obj.angle_table.add_col(Z.name + J.name)
-    #     dd_obj.ratio_table.add_col(X.name + J.name)
-    #     dd_obj.ratio_table.add_col(Y.name + J.name)
-    #     dd_obj.ratio_table.add_col(Z.name + J.name)
-    #     for relation in new_relations:
-    #         dd_obj.problem.add_relation(relation)
-    #         dd_obj.update_AR_tables_with_relation(relation)
-    #     plot_newpoint(ax, J)
-    #     plot_newpoint(ax, X)
-    #     plot_newpoint(ax, Y)
-    #     plot_newpoint(ax, Z)
-    #     plot_newcircle(ax, J, X)
-    #     return X, Y, Z, J
-
-    # def centroid(ax, x_counter, y_counter, z_counter, g_counter, dd_obj: DDWithAR, A: Point, B: Point, C: Point):
-    #     X = Point("X" + str(x_counter), (B.x + C.x) / 2, (B.y + C.y) / 2)
-    #     Y = Point("Y" + str(y_counter), (A.x + C.x) / 2, (A.y + C.y) / 2)
-    #     Z = Point("Z" + str(z_counter), (A.x + B.x) / 2, (A.y + B.y) / 2)
-    #     G = find_intersection(A, X, B, Y)
-    #     G.name = "G" + str(g_counter)
-    #     dd_obj.problem.points.extend([X, Y, Z, G])
-    #     new_relations = [Collinear(X, B, C), Collinear(Y, A, C), Collinear(Z, A, B),
-    #                     Midpoint(X, B, C), Collinear(Y, A, C), Collinear(Z, A, B)]
-    #     dd_obj.angle_table.add_col(X.name + B.name)
-    #     dd_obj.angle_table.add_col(X.name + C.name)
-    #     dd_obj.angle_table.add_col(Y.name + A.name)
-    #     dd_obj.angle_table.add_col(Y.name + C.name)
-    #     dd_obj.angle_table.add_col(Z.name + A.name)
-    #     dd_obj.angle_table.add_col(Z.name + B.name)
-    #     dd_obj.ratio_table.add_col(X.name + B.name)
-    #     dd_obj.ratio_table.add_col(X.name + C.name)
-    #     dd_obj.ratio_table.add_col(Y.name + A.name)
-    #     dd_obj.ratio_table.add_col(Y.name + C.name)
-    #     dd_obj.ratio_table.add_col(Z.name + A.name)
-    #     dd_obj.ratio_table.add_col(Z.name + B.name)
-    #     for relation in new_relations:
-    #         dd_obj.problem.add_relation(relation)
-    #         dd_obj.update_AR_tables_with_relation(relation)
-    #     plot_newpoint(ax, G)
-    #     plot_newpoint(ax, X)
-    #     plot_newpoint(ax, Y)
-    #     plot_newpoint(ax, Z)
-    #     return G, X, Y, Z
-
-
-
-
-
-
-
-
-
-
-
 
 
 def setup_geometry_plot(square: bool = True):

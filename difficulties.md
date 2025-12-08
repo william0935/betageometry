@@ -1,13 +1,45 @@
-Current difficulties with AR:
+## Rough attempt to finetune gemma
 
-1. There are weird things going on with points whose positions cannot be uniquely determined by the data we store.
-   Consider the following examples:
+import os
+import optax
+import treescope
+from kauldron import kd
+from gemma import gm
+from datasets import load_dataset
 
-- $\angle BOR=\angle YOD$; $B,D,O$ collinear; $\angle OBR=\angle BRO$; $\angle OBY=\angle BYO$, $\angle ORY=\angle RYO$.
-  Where is $R$? It can either be on the same or opposite side of $BD$ with $Y$. This will lead to $\angle BOR=\angle BOY$. (I tackled this problem by both checking AR and **visual effects**: if they look like equal angles)
-- $\angle BOR=\angle YOD$; $B,D,O$ collinear; $\angle OBR=\angle BRO$; $\angle OBY=\angle ORD$; $\angle OBY=\angle BYO$. Where is $D$? It can either be the same point as $B$ or not. In this case, if we are to add another relation $BR\perp DR$, then it will lead to $90\degree=0$. (I do not have a good idea for this).  
-  Possible solution: such things happen because of division operations happening in checking the span in AR. For instance, $$2\angle A=2\angle B \implies \angle A=\angle B \text{ or } \angle B+90\degree \text{ or } \angle B -90\degree.$$
-  The exact value should be derived from the diagram.
+#initiallization
+tokenizer = gm.text.Gemma3Tokenizer()
+model = gm.nn.Gemma3_4B(tokens="batch.input",)
+loss = kd.losses.SoftmaxCrossEntropyWithIntLabels(
+logits="preds.logits",
+labels="batch.target",
+mask="batch.loss_mask",
+)
 
-2. The current triangle congruency and similarity checks need to go through all triangles in every iteration, which significantly slows down the program.  
-   Possible solution: the system can preprocess the diagram to get all possible pairs of congruent/similar triangles.
+#dataset -- this is the sketchiest part. Not sure how to correctly load/format our file
+ds = load_dataset("json", data_files="training_data.jsonl")
+def format_example(example):
+if "input_text" in example and "output_text" in example:
+return {
+"text": f"<start_of_turn>user\n{example['input_text']}<end_of_turn>\n"
+f"<start_of_turn>assistant\n{example['output_text']}<end_of_turn>"
+}
+return example
+
+dataset = ds.map(format_example)
+
+#train
+trainer = kd.train.Trainer(
+seed=42, # The seed of enlightenment
+workdir='/tmp/ckpts', # TODO(epot): Make the workdir optional by default # Dataset
+train_ds=ds, # Model
+model=model,
+init_transform=gm.ckpts.LoadCheckpoint( # Load the weights from the pretrained checkpoint
+path=gm.ckpts.CheckpointPath.GEMMA3_4B_IT,
+), # Training parameters
+num_train_steps=300,
+train_losses={"loss": loss},
+optimizer=optax.adafactor(learning_rate=1e-3),
+)
+
+trainer.train()

@@ -376,27 +376,49 @@ class Canva:
         return c, [perp, cong]
 
     def tangent2(self, a: Point, o: Point, b: Point) -> Tuple[List[Point], List[RelationNode]]:
-        # tangent from point a to circle with center o passing through b
-        A, O, B = np.array([a.x, a.y]), np.array([o.x, o.y]), np.array([b.x, b.y])
+        """
+        Tangent from point a to circle with center o passing through b.
+        """
+        A = np.array([a.x, a.y])
+        O = np.array([o.x, o.y])
+        B = np.array([b.x, b.y])
         OB = B - O
         r = np.linalg.norm(OB)
-        AO = O - A
-        d = np.linalg.norm(AO)
-        if d - r < 1e-10:
+        OA = A - O
+        d = np.linalg.norm(OA)
+
+        # no real tangents if A is inside or on the circle
+        EPS = 1e-12
+        if d <= r + EPS:
             return [], []
-        l = np.sqrt(d**2 - r**2)
-        AO_norm = AO / d
-        perp_dir = np.array([-AO_norm[1], AO_norm[0]])
-        T1 = A + AO_norm * (r**2 / d) + perp_dir * (r * l / d)
-        T2 = A + AO_norm * (r**2 / d) - perp_dir * (r * l / d)
+
+        # unit vector from O to A
+        e = OA / d
+        perp = np.array([-e[1], e[0]])  # unit perpendicular
+
+        # stable computation for the sqrt argument
+        arg = max(0.0, d * d - r * r)
+        l = np.sqrt(arg)
+
+        # correct vector formula for tangent points (measured from O)
+        factor_along = (r * r) / (d * d) * OA
+        factor_perp = (r / d) * l * perp
+
+        T1 = O + factor_along + factor_perp
+        T2 = O + factor_along - factor_perp
+
         t1 = self.add_point(T1[0], T1[1])
         t2 = self.add_point(T2[0], T2[1])
+
         line_name1 = f"Line_{a.name}{t1.name}"
         line_name2 = f"Line_{a.name}{t2.name}"
         circle_name = f"Circle_{o.name}{b.name}{t1.name}{t2.name}"
+
+        # store line equations (coeffs scaled are fine)
         self.lines[line_name1] = (t1.y - a.y, a.x - t1.x, t1.x * a.y - t1.y * a.x)
         self.lines[line_name2] = (t2.y - a.y, a.x - t2.x, t2.x * a.y - t2.y * a.x)
         self.circles[circle_name] = (o.x, o.y, r)
+
         circle = Circle(o, b, t1, t2, rule="construction")
         perp1 = Perpendicular(a, t1, o, t1, rule="construction")
         perp2 = Perpendicular(a, t2, o, t2, rule="construction")

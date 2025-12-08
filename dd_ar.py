@@ -8,6 +8,7 @@ from Problem import Problem
 from typing import List, Tuple, Optional
 from ar import *
 from Constructions import *
+from Constructions import *
 
 class DDWithAR:    
     def __init__(self, problem: Problem):
@@ -31,6 +32,8 @@ class DDWithAR:
             self.eqratioDBDCABAC_colDBC__eqangleBADDAC,
             self.eqangleBADDAC_colDBC__eqratioDBDCABAC,
             self.perpABBC_congMAMC_colMAC__congAMBM,
+            self.congAPBP_congAQBQ__perpABPQ,
+            self.check_collinearity
             self.congAPBP_congAQBQ__perpABPQ,
             self.check_collinearity
         ]
@@ -222,6 +225,7 @@ h1,h2 { color: #333; }
             self.area_table.add_eqarea(area)
 
         self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
+        self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
@@ -251,6 +255,7 @@ h1,h2 { color: #333; }
 
             if self.problem.is_solved():
                 print(f"Problem solved in iteration {iteration}!")
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
                       
@@ -1180,6 +1185,20 @@ h1,h2 { color: #333; }
                         rule="congAPBP_congAQBQ__perpABPQ"
                     ))
             
+        return new_relations
+    
+    def check_collinearity(self) -> List[RelationNode]:
+        """Check for all three points that are collinear."""
+        new_relations = []
+        collinears = self.problem.collinear_triples
+        for p1, p2, p3 in collinears:
+            are_collinear, parents = self.are_points_collinear(p1, p2, p3)
+            if are_collinear:
+                new_relations.append(Collinear(
+                    p1, p2, p3,
+                    parents=parents,
+                    rule="check_collinear"
+                ))
         return new_relations
     
     def check_collinearity(self) -> List[RelationNode]:

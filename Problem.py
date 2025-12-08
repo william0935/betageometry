@@ -23,6 +23,7 @@ class Problem:
         self.similar_triangle_pairs = self.find_similar_triangle_pairs()
         self.cyclic_quads = self.find_cyclic_quads()
         self.collinear_triples = self.find_collinear_triples()
+        self.collinear_triples = self.find_collinear_triples()
         # print(self.similar_triangle_pairs)
         # print(self.cyclic_quads)
         for r in self.assumptions:

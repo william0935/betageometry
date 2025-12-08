@@ -121,66 +121,66 @@ class Problem:
         
         return False
     
-    def relation_contradict_graph(self, relation: RelationNode) -> bool:
-        if relation.name == "cong":
-            p1, p2, p3, p4 = relation.points
-            seg1 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
-            seg2 = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
-            return (seg1 - seg2) > 1e-5
-        elif relation.name == "eqangle":
-            p1, p2, p3, p4, p5, p6 = relation.points
-            angle1 = self.angle_value(p1, p2, p3)
-            angle2 = self.angle_value(p4, p5, p6)
-            return abs(angle1 - angle2) > 1e-5
-        elif relation.name == "para":
-            p1, p2, p3, p4 = relation.points
-            vec1 = np.array([p2.x - p1.x, p2.y - p1.y])
-            vec2 = np.array([p4.x - p3.x, p4.y - p3.y])
-            cross_product = np.cross(vec1, vec2)
-            return abs(cross_product) > 1e-5
-        elif relation.name == "perp":
-            p1, p2, p3, p4 = relation.points
-            vec1 = np.array([p2.x - p1.x, p2.y - p1.y])
-            vec2 = np.array([p4.x - p3.x, p4.y - p3.y])
-            dot_product = np.dot(vec1, vec2)
-            return abs(dot_product) > 1e-5
-        elif relation.name == "col":
-            p1, p2, p3 = relation.points
-            area = abs(0.5 * (p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)))
-            return area > 1e-5
-        elif relation.name == "cyclic":
-            p1, p2, p3, p4 = relation.points
-            angle1 = self.angle_value(p1, p3, p2)
-            angle2 = self.angle_value(p1, p4, p2)
-            return (abs(angle1 + angle2 - 180) > 1e-5 and abs(angle1 - angle2) > 1e-5) or \
-                     self.relation_contradict_graph(RelationNode("col", [p1, p2, p3])) or \
-                     self.relation_contradict_graph(RelationNode("col", [p1, p2, p4])) or \
-                     self.relation_contradict_graph(RelationNode("col", [p1, p3, p4])) or \
-                     self.relation_contradict_graph(RelationNode("col", [p2, p3, p4]))
-        elif relation.name == "eqratio":
-            p1, p2, p3, p4, p5, p6 = relation.points
-            seg1_num = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
-            seg1_den = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
-            seg2_num = (p5.x - p6.x)**2 + (p5.y - p6.y)**2
-            seg2_den = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
-            if seg1_den < 1e-9 or seg2_den < 1e-9:
-                return True
-            ratio1 = seg1_num / seg1_den
-            ratio2 = seg2_num / seg2_den
-            return abs(ratio1 - ratio2) > 1e-5
-        elif relation.name == "midp":
-            p1, p2, p3 = relation.points
-            mid_x = (p2.x + p3.x) / 2
-            mid_y = (p2.y + p3.y) / 2
-            return abs(mid_x - p1.x) > 1e-5 or abs(mid_y - p1.y) > 1e-5
-        elif relation.name == "circle":
-            center, p1, p2, p3 = relation.points
-            dist1 = (center.x - p1.x)**2 + (center.y - p1.y)**2
-            dist2 = (center.x - p2.x)**2 + (center.y - p2.y)**2
-            dist3 = (center.x - p3.x)**2 + (center.y - p3.y)**2
-            return abs(dist1 - dist2) > 1e-5 or abs(dist1 - dist3) > 1e-5 or abs(dist2 - dist3) > 1e-5
+    # def relation_contradict_graph(self, relation: RelationNode) -> bool:
+    #     if relation.name == "cong":
+    #         p1, p2, p3, p4 = relation.points
+    #         seg1 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
+    #         seg2 = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
+    #         return (seg1 - seg2) > 1e-5
+    #     elif relation.name == "eqangle":
+    #         p1, p2, p3, p4, p5, p6 = relation.points
+    #         angle1 = self.angle_value(p1, p2, p3)
+    #         angle2 = self.angle_value(p4, p5, p6)
+    #         return abs(angle1 - angle2) > 1e-5
+    #     elif relation.name == "para":
+    #         p1, p2, p3, p4 = relation.points
+    #         vec1 = np.array([p2.x - p1.x, p2.y - p1.y])
+    #         vec2 = np.array([p4.x - p3.x, p4.y - p3.y])
+    #         cross_product = np.cross(vec1, vec2)
+    #         return abs(cross_product) > 1e-5
+    #     elif relation.name == "perp":
+    #         p1, p2, p3, p4 = relation.points
+    #         vec1 = np.array([p2.x - p1.x, p2.y - p1.y])
+    #         vec2 = np.array([p4.x - p3.x, p4.y - p3.y])
+    #         dot_product = np.dot(vec1, vec2)
+    #         return abs(dot_product) > 1e-5
+    #     elif relation.name == "col":
+    #         p1, p2, p3 = relation.points
+    #         area = abs(0.5 * (p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)))
+    #         return area > 1e-5
+    #     elif relation.name == "cyclic":
+    #         p1, p2, p3, p4 = relation.points
+    #         angle1 = self.angle_value(p1, p3, p2)
+    #         angle2 = self.angle_value(p1, p4, p2)
+    #         return (abs(angle1 + angle2 - 180) > 1e-5 and abs(angle1 - angle2) > 1e-5) or \
+    #                  self.relation_contradict_graph(Collinear(p1, p2, p3)) or \
+    #                  self.relation_contradict_graph(Collinear(p1, p2, p4)) or \
+    #                  self.relation_contradict_graph(Collinear(p1, p3, p4)) or \
+    #                  self.relation_contradict_graph(Collinear(p2, p3, p4))
+    #     elif relation.name == "eqratio":
+    #         p1, p2, p3, p4, p5, p6, p7, p8 = relation.points
+    #         seg1_num = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
+    #         seg1_den = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
+    #         seg2_num = (p5.x - p6.x)**2 + (p5.y - p6.y)**2
+    #         seg2_den = (p7.x - p8.x)**2 + (p7.y - p8.y)**2
+    #         if seg1_den < 1e-9 or seg2_den < 1e-9:
+    #             return True
+    #         ratio1 = seg1_num / seg1_den
+    #         ratio2 = seg2_num / seg2_den
+    #         return abs(ratio1 - ratio2) > 1e-5
+    #     elif relation.name == "midp":
+    #         p1, p2, p3 = relation.points
+    #         mid_x = (p2.x + p3.x) / 2
+    #         mid_y = (p2.y + p3.y) / 2
+    #         return abs(mid_x - p1.x) > 1e-5 or abs(mid_y - p1.y) > 1e-5
+    #     elif relation.name == "circle":
+    #         center, p1, p2, p3 = relation.points
+    #         dist1 = (center.x - p1.x)**2 + (center.y - p1.y)**2
+    #         dist2 = (center.x - p2.x)**2 + (center.y - p2.y)**2
+    #         dist3 = (center.x - p3.x)**2 + (center.y - p3.y)**2
+    #         return abs(dist1 - dist2) > 1e-5 or abs(dist1 - dist3) > 1e-5 or abs(dist2 - dist3) > 1e-5
         
-        return False
+    #     return False
     
     def trace_back(self) -> str:
         if not self.solved:
@@ -214,6 +214,10 @@ class Problem:
             for p4, p5, p6 in permutations(points, 3):
                 if p1 == p4 and p2 == p5 and p3 == p6:
                     continue
+                if (p1.x - p2.x == 0 and p1.y - p2.y == 0) or (p4.x - p5.x == 0 and p4.y - p5.y == 0) or \
+                   (p2.x - p3.x == 0 and p2.y - p3.y == 0) or (p6.x - p4.x == 0 and p6.y - p4.y == 0) or \
+                   (p1.x - p3.x == 0 and p1.y - p3.y == 0) or (p6.x - p5.x == 0 and p6.y - p5.y == 0):
+                    continue
                 if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol:
                     continue
                 if abs(self.angle_value(p1, p2, p3) - self.angle_value(p4, p5, p6)) < tol and \
@@ -227,7 +231,10 @@ class Problem:
         points = self.points
         quads = []
         for p1, p2, p3, p4 in combinations(points, 4):
-            if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol:
+            if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol or \
+               self.angle_value(p1, p2, p4) < tol or 180 - self.angle_value(p1, p2, p4) < tol or \
+               self.angle_value(p1, p3, p4) < tol or 180 - self.angle_value(p1, p3, p4) < tol or \
+               self.angle_value(p2, p3, p4) < tol or 180 - self.angle_value(p2, p3, p4) < tol:
                 continue
             angle1 = self.angle_value(p1, p3, p2)
             angle2 = self.angle_value(p1, p4, p2)
@@ -253,6 +260,10 @@ class Problem:
             for p4, p5, p6 in permutations(points + [p1], 3):
                 if p1 == p4 and p2 == p5 and p3 == p6:
                     continue
+                if (p1.x - p2.x == 0 and p1.y - p2.y == 0) or (p4.x - p5.x == 0 and p4.y - p5.y == 0) or \
+                   (p2.x - p3.x == 0 and p2.y - p3.y == 0) or (p6.x - p4.x == 0 and p6.y - p4.y == 0) or \
+                   (p1.x - p3.x == 0 and p1.y - p3.y == 0) or (p6.x - p5.x == 0 and p6.y - p5.y == 0):
+                    continue
                 if self.angle_value(p1, p2, p3) < 1e-5 or 180 - self.angle_value(p1, p2, p3) < 1e-5:
                     continue
                 if abs(self.angle_value(p1, p2, p3) - self.angle_value(p4, p5, p6)) < tol and \
@@ -266,7 +277,10 @@ class Problem:
         points = self.points
         quads = []
         for p2, p3, p4 in combinations(points, 3):
-            if self.angle_value(p1, p2, p3) < 1e-5 or 180 - self.angle_value(p1, p2, p3) < 1e-5:
+            if self.angle_value(p1, p2, p3) < 1e-5 or 180 - self.angle_value(p1, p2, p3) < 1e-5 or \
+               self.angle_value(p1, p2, p4) < 1e-5 or 180 - self.angle_value(p1, p2, p4) < 1e-5 or \
+               self.angle_value(p1, p3, p4) < 1e-5 or 180 - self.angle_value(p1, p3, p4) < 1e-5 or \
+               self.angle_value(p2, p3, p4) < 1e-5 or 180 - self.angle_value(p2, p3, p4) < 1e-5:
                 continue
             angle1 = self.angle_value(p1, p3, p2)
             angle2 = self.angle_value(p1, p4, p2)

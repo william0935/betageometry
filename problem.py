@@ -22,6 +22,7 @@ class Problem:
         self.deduction_steps = []
         self.similar_triangle_pairs = self.find_similar_triangle_pairs()
         self.cyclic_quads = self.find_cyclic_quads()
+        self.collinear_triples = self.find_collinear_triples()
         # print(self.similar_triangle_pairs)
         # print(self.cyclic_quads)
         for r in self.assumptions:
@@ -99,14 +100,86 @@ class Problem:
             return set({p1, p2}) == set({p3, p4})
         elif relation.name == "eqangle":
             p1, p2, p3, p4, p5, p6 = relation.points
-            return (frozenset({p1, p2}), frozenset({p2, p3})) == (frozenset({p4, p5}), frozenset({p5, p6}))
+            return (frozenset({p1, p2}), frozenset({p2, p3})) == (frozenset({p4, p5}), frozenset({p5, p6})) or \
+                   len({p1, p2, p3}) < 3 or len({p4, p5, p6}) < 3
         elif relation.name == "contri1" or relation.name == "contri2":
             p1, p2, p3, p4, p5, p6 = relation.points
-            return (p1, p2, p3) == (p4, p5, p6)
+            return (p1, p2, p3) == (p4, p5, p6) or \
+                     len({p1, p2, p3}) < 3 or len({p4, p5, p6}) < 3
         elif relation.name == "simtri1" or relation.name == "simtri2":
             p1, p2, p3, p4, p5, p6 = relation.points
             return set((p1, p2, p3)) == set((p4, p5, p6)) or \
-                   any(relation.relation == contri.relation for contri in self.relations["contri1"] + self.relations["contri2"])
+                   any(relation.relation == contri.relation for contri in self.relations["contri1"] + self.relations["contri2"]) or \
+                     len({p1, p2, p3}) < 3 or len({p4, p5, p6}) < 3
+        elif relation.name == "col":
+            return len(set(relation.points)) < 3
+        elif relation.name == "para" or relation.name == "perp":
+            p1, p2, p3, p4 = relation.points
+            return set({p1, p2}) == set({p3, p4})
+        elif relation.name == "cyclic":
+            return len(set(relation.points)) < 4
+        
+        return False
+    
+    def relation_contradict_graph(self, relation: RelationNode) -> bool:
+        if relation.name == "cong":
+            p1, p2, p3, p4 = relation.points
+            seg1 = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
+            seg2 = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
+            return (seg1 - seg2) > 1e-5
+        elif relation.name == "eqangle":
+            p1, p2, p3, p4, p5, p6 = relation.points
+            angle1 = self.angle_value(p1, p2, p3)
+            angle2 = self.angle_value(p4, p5, p6)
+            return abs(angle1 - angle2) > 1e-5
+        elif relation.name == "para":
+            p1, p2, p3, p4 = relation.points
+            vec1 = np.array([p2.x - p1.x, p2.y - p1.y])
+            vec2 = np.array([p4.x - p3.x, p4.y - p3.y])
+            cross_product = np.cross(vec1, vec2)
+            return abs(cross_product) > 1e-5
+        elif relation.name == "perp":
+            p1, p2, p3, p4 = relation.points
+            vec1 = np.array([p2.x - p1.x, p2.y - p1.y])
+            vec2 = np.array([p4.x - p3.x, p4.y - p3.y])
+            dot_product = np.dot(vec1, vec2)
+            return abs(dot_product) > 1e-5
+        elif relation.name == "col":
+            p1, p2, p3 = relation.points
+            area = abs(0.5 * (p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)))
+            return area > 1e-5
+        elif relation.name == "cyclic":
+            p1, p2, p3, p4 = relation.points
+            angle1 = self.angle_value(p1, p3, p2)
+            angle2 = self.angle_value(p1, p4, p2)
+            return (abs(angle1 + angle2 - 180) > 1e-5 and abs(angle1 - angle2) > 1e-5) or \
+                     self.relation_contradict_graph(RelationNode("col", [p1, p2, p3])) or \
+                     self.relation_contradict_graph(RelationNode("col", [p1, p2, p4])) or \
+                     self.relation_contradict_graph(RelationNode("col", [p1, p3, p4])) or \
+                     self.relation_contradict_graph(RelationNode("col", [p2, p3, p4]))
+        elif relation.name == "eqratio":
+            p1, p2, p3, p4, p5, p6 = relation.points
+            seg1_num = (p1.x - p2.x)**2 + (p1.y - p2.y)**2
+            seg1_den = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
+            seg2_num = (p5.x - p6.x)**2 + (p5.y - p6.y)**2
+            seg2_den = (p3.x - p4.x)**2 + (p3.y - p4.y)**2
+            if seg1_den < 1e-9 or seg2_den < 1e-9:
+                return True
+            ratio1 = seg1_num / seg1_den
+            ratio2 = seg2_num / seg2_den
+            return abs(ratio1 - ratio2) > 1e-5
+        elif relation.name == "midp":
+            p1, p2, p3 = relation.points
+            mid_x = (p2.x + p3.x) / 2
+            mid_y = (p2.y + p3.y) / 2
+            return abs(mid_x - p1.x) > 1e-5 or abs(mid_y - p1.y) > 1e-5
+        elif relation.name == "circle":
+            center, p1, p2, p3 = relation.points
+            dist1 = (center.x - p1.x)**2 + (center.y - p1.y)**2
+            dist2 = (center.x - p2.x)**2 + (center.y - p2.y)**2
+            dist3 = (center.x - p3.x)**2 + (center.y - p3.y)**2
+            return abs(dist1 - dist2) > 1e-5 or abs(dist1 - dist3) > 1e-5 or abs(dist2 - dist3) > 1e-5
+        
         return False
     
     def trace_back(self) -> str:
@@ -153,17 +226,63 @@ class Problem:
         "find all possible cyclic quadrilaterals among the points according to the diagram"
         points = self.points
         quads = []
-        for p1, p2 in combinations(points, 2):
-            for p3, p4 in permutations(points, 2):
-                if len({p1, p2, p3, p4}) < 4:
-                    continue
-                if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol:
-                    continue
-                angle1 = self.angle_value(p1, p3, p2)
-                angle2 = self.angle_value(p1, p4, p2)
-                if abs(angle1 + angle2 - 180) < tol or abs(angle1 - angle2) < tol:
-                    quads.append((p1, p2, p3, p4))
+        for p1, p2, p3, p4 in combinations(points, 4):
+            if self.angle_value(p1, p2, p3) < tol or 180 - self.angle_value(p1, p2, p3) < tol:
+                continue
+            angle1 = self.angle_value(p1, p3, p2)
+            angle2 = self.angle_value(p1, p4, p2)
+            if abs(angle1 + angle2 - 180) < tol or abs(angle1 - angle2) < tol:
+                quads.append((p1, p2, p3, p4))
         return quads
+    
+    def find_collinear_triples(self, tol=1e-5) -> List[Tuple[Point, Point, Point]]:
+        "find all possible collinear triples among the points according to the diagram"
+        points = self.points
+        triples = []
+        for p1, p2, p3 in combinations(points, 3):
+            area = abs(0.5 * (p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)))
+            if area < tol:
+                triples.append((p1, p2, p3))
+        return triples
+    
+    def given_point_similar_triangle_pairs(self, p1: Point, tol=1e-5) -> List[Tuple[Point, Point, Point, Point, Point, Point]]:
+        "find all similar triangle pairs involving the given point"
+        points = self.points
+        pairs = []
+        for p2, p3 in combinations(points, 2):
+            for p4, p5, p6 in permutations(points + [p1], 3):
+                if p1 == p4 and p2 == p5 and p3 == p6:
+                    continue
+                if self.angle_value(p1, p2, p3) < 1e-5 or 180 - self.angle_value(p1, p2, p3) < 1e-5:
+                    continue
+                if abs(self.angle_value(p1, p2, p3) - self.angle_value(p4, p5, p6)) < tol and \
+                   abs(self.angle_value(p2, p3, p1) - self.angle_value(p5, p6, p4)) < tol and \
+                   abs(self.angle_value(p3, p1, p2) - self.angle_value(p6, p4, p5)) < tol:
+                    pairs.append((p1, p2, p3, p4, p5, p6))
+        return pairs
+    
+    def given_point_cyclic_quads(self, p1: Point) -> List[Tuple[Point, Point, Point, Point]]:
+        "find all cyclic quadrilaterals involving the given point"
+        points = self.points
+        quads = []
+        for p2, p3, p4 in combinations(points, 3):
+            if self.angle_value(p1, p2, p3) < 1e-5 or 180 - self.angle_value(p1, p2, p3) < 1e-5:
+                continue
+            angle1 = self.angle_value(p1, p3, p2)
+            angle2 = self.angle_value(p1, p4, p2)
+            if abs(angle1 + angle2 - 180) < 1e-5 or abs(angle1 - angle2) < 1e-5:
+                quads.append((p1, p2, p3, p4))
+        return quads
+    
+    def given_point_collinear_triples(self, p1: Point) -> List[Tuple[Point, Point, Point]]:
+        "find all collinear triples involving the given point"
+        points = self.points
+        triples = []
+        for p2, p3 in combinations(points, 2):
+            area = abs(0.5 * (p1.x*(p2.y - p3.y) + p2.x*(p3.y - p1.y) + p3.x*(p1.y - p2.y)))
+            if area < 1e-5:
+                triples.append((p1, p2, p3))
+        return triples
 
     def angle_value(self, a: Point, b: Point, c: Point) -> float:
         "compute the angle value of angle ABC in degrees"

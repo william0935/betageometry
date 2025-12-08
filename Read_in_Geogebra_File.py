@@ -327,8 +327,3 @@ def parse_picture(filename: str):
     new_circles = rename_circle_dictionary(circles)
     new_lines = combine_lines_and_segments_dictionaries(lines,segments)
     return points, new_lines, new_circles
-
-x,y,z= parse_picture('test.ggb')
-print(x)
-print(y)
-print(z)

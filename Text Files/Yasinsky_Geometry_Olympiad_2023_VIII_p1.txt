@@ -1,0 +1,1 @@
+circle O A B C; col A O T; col B C T; perp T E A B; perp T F A C; col B O E; col C O F; ? cong B E C F

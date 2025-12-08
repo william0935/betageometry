@@ -7,6 +7,7 @@ from relations import *
 from Problem import Problem
 from typing import List, Tuple, Optional
 from ar import *
+from Constructions import *
 
 class DDWithAR:    
     def __init__(self, problem: Problem):
@@ -19,7 +20,6 @@ class DDWithAR:
         self.rules = [
             self.check_triangle_congruence_all_permutations,
             self.check_triangle_similarity_all_permutations,
-            self.congMAMB_colMAB__midpointMAB,
             self.congOAOB_congOBOC__circleOABC,
             self.circleOABC_congOCOD__cyclicABCD,
             self.eqangleABCADC__cyclicABCD,
@@ -31,7 +31,8 @@ class DDWithAR:
             self.eqratioDBDCABAC_colDBC__eqangleBADDAC,
             self.eqangleBADDAC_colDBC__eqratioDBDCABAC,
             self.perpABBC_congMAMC_colMAC__congAMBM,
-            self.congAPBP_congAQBQ__perpABPQ
+            self.congAPBP_congAQBQ__perpABPQ,
+            self.check_collinearity
         ]
 
     # def print_table(self, table):
@@ -172,7 +173,30 @@ h1,h2 { color: #333; }
 
         self._write_html_file(filename, fragment, mode=mode)
 
-    def apply_deduction_rules(self, max_iterations: int, save_AR_tables: bool) -> bool:
+
+    def add_constructed_point(self, point: Point):
+        "add a constructed point to the problem and update AR tables"
+        points = self.problem.points
+        for existing_point in points:
+            if existing_point.name == point.name:
+                raise ValueError(f"Point with name {point.name} already exists in the problem.")
+            seg = frozenset({existing_point, point})
+            self.angle_table.add_col(seg)
+            self.ratio_table.add_col(seg)
+            self.area_table.add_col(seg)
+        
+        self.problem.similar_triangle_pairs.extend(self.problem.given_point_similar_triangle_pairs(point))
+        self.problem.cyclic_quads.extend(self.problem.given_point_cyclic_quads(point))
+        self.problem.collinear_triples.extend(self.problem.given_point_collinear_triples(point))
+        points.append(point)
+
+    def add_constructed_relation(self, relation: RelationNode):
+        "add a constructed relation to the problem and update AR tables"
+        self.problem.add_relation(relation)
+        self.update_AR_tables_with_relation(relation)
+
+
+    def apply_deduction_rules(self, max_iterations: int, canva: Canva) -> bool:
         # initialize all the names of the angles and segments into the angle table and ratio table
         for point1, point2 in itertools.combinations(self.problem.points, 2):
             segment = frozenset({point1, point2})
@@ -197,14 +221,7 @@ h1,h2 { color: #333; }
         for area in self.problem.relations.get("eqarea", []):
             self.area_table.add_eqarea(area)
 
-        # print("Initial Angle Table:")
-        # self.print_table(self.angle_table)
-        # print("Initial Ratio Table:")
-        # self.print_table(self.ratio_table)
-        # print("Initial Area Table:")
-        # self.print_table(self.area_table)
-        if save_AR_tables:
-            self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
+        self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
@@ -213,6 +230,13 @@ h1,h2 { color: #333; }
 
             for rule in self.rules:
                 new_relations.extend(rule())
+
+            for goal in self.problem.remaining_goals:
+                is_related, parents = self.check_relation(goal)
+                if is_related:
+                    goal.parents = parents
+                    new_relations.append(goal)
+                    progress_made = True
 
             for new_rel in new_relations:
                 progress = self.problem.add_relation(new_rel)
@@ -225,69 +249,16 @@ h1,h2 { color: #333; }
                         for equiv_rel in new_rel.equivalent:
                             self.update_AR_tables_with_relation(equiv_rel)
 
-            if not progress_made:
-                print(f"No new relations in iteration {iteration}. Stopping.")
-                if save_AR_tables:
-                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
-                break
-                
             if self.problem.is_solved():
                 print(f"Problem solved in iteration {iteration}!")
-                if save_AR_tables:
-                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
-            
-            for goal in self.problem.remaining_goals:
-                is_related, parents = self.check_relation(goal)
-                if is_related:
-                    self.problem.remaining_goals.remove(goal)
-                    goal.parents = parents
-                    self.problem.add_relation(goal)
-                    self.problem.deduction_steps.append(goal)
-                    if not self.problem.remaining_goals:
-                        self.problem.solved = True
-                        break
+                      
+            if not progress_made:
+                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                break
                 
         return self.problem.is_solved()
-    
-    def congMAMB_colMAB__midpointMAB(self) -> List[RelationNode]:
-        new_relations = []
-        congruences = self.problem.relations.get("cong", [])
-        collinears = self.problem.relations.get("col", [])
-        
-        for cong in congruences:
-            p1, p2, p3, p4 = cong.points
-            if p1 == p4:
-                p3, p4 = p4, p3
-            elif p2 == p3:
-                p1, p2 = p2, p1
-            elif p2 == p4:
-                p1, p2, p3, p4 = p2, p1, p4, p3
-            elif p1 == p3:
-                pass
-            else:
-                continue
-
-            M, A, B = p1, p2, p4
-            seg_MA = frozenset({M, A})
-            seg_MB = frozenset({M, B})
-
-            if seg_MA in self.ratio_table.col_id and seg_MB in self.ratio_table.col_id:
-                cong_row = [0] * self.ratio_table.table_length()
-                cong_row[self.ratio_table.col_id[seg_MA]] = 1
-                cong_row[self.ratio_table.col_id[seg_MB]] = -1
-                
-                is_spanned, parents = self.ratio_table.is_spanned(cong_row)
-                if is_spanned:
-                    col = next((c for c in collinears if set(c.points) == set({M, A, B})), None)
-                    if col:
-                        new_relations.append(Midpoint(
-                            M, A, B,
-                            parents=parents,
-                            rule="cong_MAMB_col_MAB__midpoint_MAB"
-                        ))
-        
-        return new_relations
 
     def check_triangle_congruence_all_permutations(self) -> List[RelationNode]:
         """Check for triangle congruence for all permutations of triangle vertices."""
@@ -1210,6 +1181,20 @@ h1,h2 { color: #333; }
                     ))
             
         return new_relations
+    
+    def check_collinearity(self) -> List[RelationNode]:
+        """Check for all three points that are collinear."""
+        new_relations = []
+        collinears = self.problem.collinear_triples
+        for p1, p2, p3 in collinears:
+            are_collinear, parents = self.are_points_collinear(p1, p2, p3)
+            if are_collinear:
+                new_relations.append(Collinear(
+                    p1, p2, p3,
+                    parents=parents,
+                    rule="check_collinear"
+                ))
+        return new_relations
 
     """
     Helper methods for specific rules starts here.
@@ -1243,6 +1228,9 @@ h1,h2 { color: #333; }
         elif isinstance(rel, Perpendicular):
             p1, p2, p3, p4 = rel.points
             return self.are_lines_perpendicular(frozenset({p1, p2}), frozenset({p3, p4}))
+        elif isinstance(rel, Midpoint):
+            mid, p1, p2 = rel.points
+            return self.is_midpoint(mid, p1, p2)
         else:
             return False, set()
     
@@ -1319,14 +1307,17 @@ h1,h2 { color: #333; }
             frozenset({p1, p3}) not in self.angle_table.col_id):
             return False, set()
 
-        if (p2.x - p1.x == 0 and p3.x - p2.x != 0) or (p3.x - p2.x == 0 and p2.x - p1.x != 0):
-            return False, set()
-        elif p2.x - p1.x != 0 and p3.x - p2.x != 0:
-            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-            gradient2 = (p3.y - p2.y) / (p3.x - p2.x)
-            if abs(gradient1 - gradient2) > 1e-6:
-                return False, set()
+        P1 = np.array([[p1.x], [p1.y]])
+        P2 = np.array([[p2.x], [p2.y]])
+        P3 = np.array([[p3.x], [p3.y]])
 
+        area_matrix = np.array([[P1[0][0], P1[1][0], 1],
+                                [P2[0][0], P2[1][0], 1],
+                                [P3[0][0], P3[1][0], 1]])
+        area = 0.5 * np.linalg.det(area_matrix)
+        if abs(area) > 1e-5:
+            return False, set()
+        
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[frozenset({p1, p2})]] += 1
         row1[self.angle_table.col_id[frozenset({p2, p3})]] += -1
@@ -1355,13 +1346,16 @@ h1,h2 { color: #333; }
             frozenset({p3, p4}) not in self.angle_table.col_id):
             return False, set()
 
-        if (p2.x - p1.x == 0 and p4.x - p3.x != 0) or (p4.x - p3.x == 0 and p2.x - p1.x != 0):
+        P1 = np.array([[p1.x], [p1.y]])
+        P2 = np.array([[p2.x], [p2.y]])
+        P3 = np.array([[p3.x], [p3.y]])
+        P4 = np.array([[p4.x], [p4.y]])
+
+        if np.array_equal(P2 - P1, np.array([[0], [0]])) or np.array_equal(P4 - P3, np.array([[0], [0]])):
             return False, set()
-        elif p2.x - p1.x != 0 and p4.x - p3.x != 0:
-            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-            gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
-            if abs(gradient1 - gradient2) > 1e-6:
-                return False, set()
+        cross_product = (P2 - P1)[0][0] * (P4 - P3)[1][0] - (P2 - P1)[1][0] * (P4 - P3)[0][0]
+        if abs(cross_product) > 1e-5:
+            return False, set()
         
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
@@ -1380,14 +1374,17 @@ h1,h2 { color: #333; }
         
         p1, p2 = list(seg1)
         p3, p4 = list(seg2)
-        if (p2.x - p1.x == 0 and p4.y - p3.y != 0) or (p4.x - p3.x == 0 and p2.y - p1.y != 0):
-            return False, set()
-        elif p2.x - p1.x != 0 and p4.x - p3.x != 0:
-            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-            gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
-            if abs(gradient1 * gradient2 + 1) > 1e-6:
-                return False, set()
+        P1 = np.array([[p1.x], [p1.y]])
+        P2 = np.array([[p2.x], [p2.y]])
+        P3 = np.array([[p3.x], [p3.y]])
+        P4 = np.array([[p4.x], [p4.y]])
 
+        if np.array_equal(P2 - P1, np.array([[0], [0]])) or np.array_equal(P4 - P3, np.array([[0], [0]])):
+            return False, set()
+        dot_product = (P2 - P1).T @ (P4 - P3)
+        if abs(dot_product[0][0]) > 1e-5:
+            return False, set()
+        
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[seg1]] = 1
         row1[self.angle_table.col_id[seg2]] = -1
@@ -1410,6 +1407,13 @@ h1,h2 { color: #333; }
 
     def is_midpoint(self, mid: Point, p1: Point, p2: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if mid is the midpoint of segment p1p2 via the RatioTable."""
+        M = np.array([[mid.x], [mid.y]])
+        P1 = np.array([[p1.x], [p1.y]])
+        P2 = np.array([[p2.x], [p2.y]])
+        midpoint = (P1 + P2) / 2
+        if np.linalg.norm(M - midpoint) > 1e-5:
+            return False, set()
+
         seg1 = frozenset({mid, p1})
         seg2 = frozenset({mid, p2})
 

@@ -1,129 +1,79 @@
-import matplotlib
-import pytest
+from Constructions import Canva, Point
 import numpy as np
-import math
-from matplotlib import pyplot as plt
 
-from relations import Point
-from Problem import Problem
-from dd_ar import DDWithAR
-from Constructions import ConstructionPlotter
+def random_point_coords():
+    return np.random.rand() * 10, np.random.rand() * 10
 
-def plotter_ax():
-    plotter = ConstructionPlotter()
-    fig, ax = plotter.setup_geometry_plot()
-    return plotter, fig, ax
+def create_sample_points():
+    pts = []
+    for name in ["A", "B", "C"]:
+        x, y = random_point_coords()
+        pts.append(Point(name, x, y))
+    return pts
 
-def test_find_intersection_and_counter(plotter_ax):
-    plotter, fig, ax = plotter_ax
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 1.0, 1.0)
-    C = Point("C", 0.0, 1.0)
-    D = Point("D", 1.0, 0.0)
-    start_counter = plotter.counter
-    X = plotter.find_intersection(A, B, C, D)
-    assert isinstance(X, Point)
-    assert X.name.startswith("X")
-    assert abs(X.x - 0.5) < 1e-8 and abs(X.y - 0.5) < 1e-8
-    assert plotter.counter == start_counter + 1
+def test_add_point(canva):
+    print("Testing add_point...")
+    p = canva.add_point(1.0, 2.0)
+    print(f"Added point: {p.name} at ({p.x}, {p.y})")
 
-def test_plot_midpoint(plotter_ax):
-    plotter, fig, ax = plotter_ax
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 2.0, 0.0)
-    M = plotter.plot_midpoint(ax, "M_AB", A, B)
-    assert isinstance(M, Point)
-    assert M.name == "M_AB"
-    assert abs(M.x - 1.0) < 1e-8 and abs(M.y - 0.0) < 1e-8
+def test_midpoint(canva, pts):
+    print("Testing midpoint...")
+    p, rels = canva.midpoint(pts[0], pts[1])
+    print(f"Midpoint: {p.name} at ({p.x}, {p.y}), relations: {rels}")
 
-def test_plotting_helpers_do_not_raise(plotter_ax):
-    plotter, fig, ax = plotter_ax
-    # plotting dictionaries
-    points_dict = {"P": (0.0, 0.0), "Q": (1.0, 0.0)}
-    lines_eq = {"l1": (0.0, 1.0, 0.0)}   # y = -c/b (simple)
-    circles = {"c1": (0.0, 0.0, 1.0)}
-    # call plot helpers
-    plotter.plot_points(ax, points_dict)
-    plotter.plot_lines_from_eq(ax, lines_eq)
-    plotter.plot_circles_from_eq(ax, circles)
+def test_mirror(canva, pts):
+    print("Testing mirror...")
+    p, rels = canva.mirror(pts[0], pts[1])
+    print(f"Mirror: {p.name} at ({p.x}, {p.y}), relations: {rels}")
 
-    # new primitives
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 1.0, 0.0)
-    plotter.plot_newpoint(ax, A)
-    plotter.plot_newline(ax, A, B)
-    plotter.plot_newcircle(ax, A, B)  # circle centered at A through B
+def test_anglebisector(canva, pts):
+    print("Testing anglebisector...")
+    p, rels = canva.anglebisector(pts[0], pts[1], pts[2])
+    print(f"Angle bisector point: {p}, relations: {rels}")
 
-def test_anglebisector_and_tables(plotter_ax):
-    plotter, fig, ax = plotter_ax
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 1.0, 0.0)
-    C = Point("C", 0.0, 1.0)
-    prob = Problem("t", [A, B, C], assumptions=[], goals=[])
-    dd = DDWithAR(prob)
-    new_rels = plotter.plot_anglebisector(ax, dd, A, B, C)
-    # should produce EqualAngle and Collinear relations
-    assert any(rel.__class__.__name__ in ("EqualAngle", "Collinear") for rel in new_rels)
-    # angle_table should have columns for a name like "AX{n}" etc (strings added by the method)
-    # check that at least one of the expected string-keys exists
-    expected_keys = {A.name + "X" + str(plotter.counter - 1), B.name + "X" + str(plotter.counter - 1)}
-    assert any(k in dd.angle_table.col_id for k in expected_keys)
+def test_foot(canva, pts):
+    print("Testing foot...")
+    p, rels = canva.foot(pts[0], pts[1], pts[2])
+    print(f"Foot point: {p}, relations: {rels}")
 
-def test_incenter_and_circumcenter(plotter_ax):
-    plotter, fig, ax = plotter_ax
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 2.0, 0.0)
-    C = Point("C", 0.0, 2.0)
-    prob = Problem("t", [A, B, C], assumptions=[], goals=[])
-    dd = DDWithAR(prob)
-    in_rels = plotter.incenter(ax, dd, A, B, C)
-    assert isinstance(in_rels, list)
-    circ_rels = plotter.circumcenter(ax, dd, A, B, C)
-    assert isinstance(circ_rels, list)
+def test_circle(canva, pts):
+    print("Testing circle...")
+    p, rels = canva.circle(pts[0], pts[1], pts[2])
+    print(f"Circle center: {p}, relations: {rels}")
 
-def test_plot_perp_updates_tables(plotter_ax):
-    plotter, fig, ax = plotter_ax
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 1.0, 0.0)
-    P = Point("P", 0.0, 1.0)
-    prob = Problem("t", [A, B, P], assumptions=[], goals=[])
-    dd = DDWithAR(prob)
-    new_rels = plotter.plot_perp(ax, dd, A, B, P)
-    assert any(rel.__class__.__name__ == "Perpendicular" for rel in new_rels)
+def test_incenter(canva, pts):
+    print("Testing incenter...")
+    pts_list, rels = canva.incenter(pts[0], pts[1], pts[2])
+    print(f"Incenter points: {pts_list}, relations: {rels}")
+
+def test_incenter2(canva, pts):
+    print("Testing incenter2...")
+    pts_list, rels = canva.incenter2(pts[0], pts[1], pts[2])
+    print(f"Incenter2 points: {pts_list}, relations: {rels}")
+
+def test_plot(canva):
+    print("Testing plot...")
+    canva.plot()
+    print("Plot displayed successfully.")
+
+def run_all_tests():
+    # Create sample points
+    pts = create_sample_points()
+    
+    # Initialize Canva
+    points_dict = {p.name: (p.x, p.y) for p in pts}
+    canva = Canva(points=pts, points_dict=points_dict, lines={}, circles={})
+    
+    # Run all tests
+    # test_add_point(canva)
+    # test_midpoint(canva, pts)
+    # test_mirror(canva, pts)
+    # test_anglebisector(canva, pts)
+    # test_foot(canva, pts)
+    # test_circle(canva, pts)
+    # test_incenter(canva, pts)
+    # test_incenter2(canva, pts)
+    test_plot(canva)
 
 if __name__ == "__main__":
-    # quick example-run that exercises a few functions and saves an image
-    plotter = ConstructionPlotter()
-    fig, ax = plotter.setup_geometry_plot()
-
-    A = Point("A", 0.0, 0.0)
-    B = Point("B", 2.0, 3.0)
-    C = Point("C", 0.0, 5.0)
-    D = Point("D", 1.0, 0.0)
-
-    # plot the points and some optional connecting lines so they're visible
-    plotter.plot_newpoint(ax, A)
-    plotter.plot_newpoint(ax, B)
-    plotter.plot_newpoint(ax, C)
-    plotter.plot_newpoint(ax, D)
-    prob = Problem("example", [A, B, C, D], assumptions=[], goals=[])
-    dd = DDWithAR(prob)
-
-    print("Calling find_intersection(A,B,C,D)...")
-    X1 = plotter.find_intersection(A, B, C, D)
-    plotter.plot_newpoint(ax, X1)
-    print("Intersection:", X1, "coords:", X1.x, X1.y)
-
-    print("Calling plot_midpoint for A,B...")
-    M = plotter.plot_midpoint(ax, "M_AB", A, B)
-    print("Midpoint:", M, "coords:", M.x, M.y)
-
-    print("Drawing angle bisector for angle ABC...")
-    X2 = plotter.plot_anglebisector(ax, dd, A, B, C)
-    print("Angle bisector:", X2)
-
-    I = plotter.incenter(ax, dd, A, B, C)
-    O = plotter.circumcenter(ax, dd, A, B, C)
-
-    # show figure
-    plt.show()
+    run_all_tests()

@@ -53,9 +53,16 @@ def generate_rabbit(ddar: DDWithAR, canva: Canva):
 
             if (new_points is None) or new_points == []:
                 return generate_rabbit(ddar, canva)
-
+            
             if type(new_points) is not list:
                 new_points = [new_points]
+            
+            for new_point in new_points:
+                for old_point in ddar.problem.points:
+                    if math.isclose(new_point.x, old_point.x, rel_tol=1e-9) and \
+                       math.isclose(new_point.y, old_point.y, rel_tol=1e-9):
+                        return generate_rabbit(ddar, canva)
+
             for new_point in new_points:
                 ddar.add_constructed_point(new_point)
             for r in new_point_relations:
@@ -119,8 +126,8 @@ def add_all_goals(solver: DDWithAR, new_points: List[Point]):
             A = np.array([p1.x, p1.y])
             B = np.array([p2.x, p2.y])
             C = np.array([p3.x, p3.y])
-            mid = (B + C) / 2
-            if math.isclose(mid[0], A[0], rel_tol=1e-5) and math.isclose(mid[1], A[1], rel_tol=1e-5):
+            mid = (A + B) / 2
+            if math.isclose(mid[0], C[0], rel_tol=1e-5) and math.isclose(mid[1], C[1], rel_tol=1e-5):
                 goals.append(Midpoint(p1, p2, p3))
         
             angle_ABC = solver.problem.angle_value(p1, p2, p3)
@@ -149,9 +156,12 @@ def generate_new_data(desired_iterations: int, problem: Problem, canva: Canva, s
 
     for nth_point in range(desired_iterations):
         new_points, new_point_relations, points_used, func_name = generate_rabbit(solver, canva)
+        
+        # Stop if too many points to avoid complexity explosion
         if len(solver.problem.points) >= 16:
             print("Reached maximum number of points (16); stopping generation.")
             break
+            
         func_call = func_name + "(" + ", ".join(points_used) + ")"
         add_all_goals(solver, new_points)
         solver.apply_deduction_rules(100, canva)
@@ -192,6 +202,7 @@ def generate_new_data(desired_iterations: int, problem: Problem, canva: Canva, s
 
         num_relations += len(new_relations)
 
+    # Save data
     os.makedirs("data", exist_ok=True)
     filename = f"data/training_data_{seed if seed is not None else 'noset'}.json"
     with open(filename, "w") as f:
@@ -201,48 +212,66 @@ def generate_new_data(desired_iterations: int, problem: Problem, canva: Canva, s
 
 
 if __name__ == "__main__":
-    # ARGUMENT PARSING
-    if len(sys.argv) >= 3:
-        start_seed = int(sys.argv[1])
-        end_seed = int(sys.argv[2])
-    else:
-        # Default fallback if no args provided (e.g. local test)
-        start_seed = 0
-        end_seed = 5
+    # --- MODIFIED ARGUMENT PARSING ---
+    # Now accepts a filename containing a list of seeds
+    if len(sys.argv) < 2:
+        print("Usage: python new_oscar_data_generation.py <seed_file_path>")
+        sys.exit(1)
 
-    print(f"Processing seeds {start_seed} to {end_seed}")
+    seed_file_path = sys.argv[1]
+    
+    if not os.path.exists(seed_file_path):
+        print(f"Error: Seed file '{seed_file_path}' not found.")
+        sys.exit(1)
+
+    print(f"Reading seeds from {seed_file_path}...")
+    
+    seeds_to_process = []
+    with open(seed_file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.isdigit():
+                seeds_to_process.append(int(line))
+
+    print(f"Found {len(seeds_to_process)} seeds to process.")
+    
     nontrivial_seeds = []
     
-    for seed in range(start_seed, end_seed):
-        print(f"\n=== Running seed {seed} ===")
-        # Essential: Reset random state for every seed loop
-        random.seed(seed)
-        np.random.seed(seed)
+    for seed in seeds_to_process:
+        try:
+            print(f"\n=== Running seed {seed} ===")
+            # Essential: Reset random state for every seed loop
+            random.seed(seed)
+            np.random.seed(seed)
 
-        # Setup Problem (Canvas) for this seed
-        canva = Canva([], {}, {}, {})
-        points = []
-        for _ in range(4):
-            points.append(canva.free())
+            # Setup Problem (Canvas) for this seed
+            canva = Canva([], {}, {}, {})
+            points = []
+            for _ in range(4):
+                points.append(canva.free())
 
-        goals = [Collinear(points[0], points[1], points[2])] # Impossible goal to drive deduction
+            goals = [Collinear(points[0], points[1], points[2])] # Impossible goal to drive deduction
 
-        problem = Problem(f"random_problem_seed_{seed}", points, [], goals)
+            problem = Problem(f"random_problem_seed_{seed}", points, [], goals)
 
-        # Run generation
-        solver, json_data = generate_new_data(4, problem, canva, seed=seed)
+            # Run generation
+            solver, json_data = generate_new_data(4, problem, canva, seed=seed)
 
-        if json_data:
-            print(f"Seed {seed} produced {len(json_data)} data points -> non-trivial")
-            nontrivial_seeds.append(seed)
-        else:
-            print(f"Seed {seed} produced no data points")
+            if json_data:
+                print(f"Seed {seed} produced {len(json_data)} data points -> non-trivial")
+                nontrivial_seeds.append(seed)
+            else:
+                print(f"Seed {seed} produced no data points")
+        except Exception as e:
+            print(f"Error processing seed {seed}: {e}")
 
-    # Save summary for this specific batch
+    # Save summary for this specific batch file
     if nontrivial_seeds:
         os.makedirs("data", exist_ok=True)
-        # Unique filename prevents race conditions between parallel jobs
-        summary_filename = f"data/nontrivial_seeds_{start_seed}_{end_seed}.txt"
+        # Use the batch filename to create a unique summary filename
+        # e.g., seed_batches/batch_0.txt -> data/nontrivial_batch_0.txt
+        batch_name = os.path.basename(seed_file_path).replace('.txt', '')
+        summary_filename = f"data/nontrivial_{batch_name}.txt"
         with open(summary_filename, "w") as f:
             for s in nontrivial_seeds:
                 f.write(f"{s}\n")

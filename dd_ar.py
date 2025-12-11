@@ -35,35 +35,6 @@ class DDWithAR:
             self.check_collinearity
         ]
 
-    # def print_table(self, table):
-    #     if not table.rows:
-    #         print("  (empty)")
-    #         print()
-    #         return
-
-    #     header_indices = "         " + "".join(f"     [{i:1d}]" for i in range(len(table.header)))
-    #     segment_names = []
-    #     for col in table.header:
-    #         if isinstance(col, frozenset):
-    #             name = "{" + ", ".join(sorted(str(x) for x in col)) + "}"
-    #         else:
-    #             name = str(col)
-    #         segment_names.append(f"{name:>8}")
-    #     header_names = "          " + "".join(segment_names)
-        
-    #     print(header_indices)
-    #     print(header_names)
-    #     print("  " + "-" * (len(header_indices) - 2))
-
-    #     row_index = 0
-    #     for relation, row_list in table.rows.items():
-    #         for row in row_list:
-    #             row_str = "  Row " + f"{row_index}: " + "".join(f"{val:8.2f}" if abs(val) > 1e-10 else "    0.00" for val in row)
-    #             row_str += f"  # {relation}"
-    #             print(row_str)
-    #             row_index += 1
-    #     print()
-
     def render_table_html(self, table) -> str:
         """Return an HTML fragment rendering `table` as a labeled HTML table."""
         if not table.rows:
@@ -179,7 +150,7 @@ h1,h2 { color: #333; }
         points = self.problem.points
         for existing_point in points:
             if existing_point.name == point.name:
-                raise ValueError(f"Point with name {point.name} already exists in the problem.")
+                continue
             seg = frozenset({existing_point, point})
             self.angle_table.add_col(seg)
             self.ratio_table.add_col(seg)
@@ -188,7 +159,6 @@ h1,h2 { color: #333; }
         self.problem.similar_triangle_pairs.extend(self.problem.given_point_similar_triangle_pairs(point))
         self.problem.cyclic_quads.extend(self.problem.given_point_cyclic_quads(point))
         self.problem.collinear_triples.extend(self.problem.given_point_collinear_triples(point))
-        points.append(point)
 
     def add_constructed_relation(self, relation: RelationNode):
         "add a constructed relation to the problem and update AR tables"
@@ -890,11 +860,47 @@ h1,h2 { color: #333; }
         new_relations = []
         cyclic_quads = self.problem.cyclic_quads
         for (p1, p2, p3, p4) in cyclic_quads:
-            are_eq_angle, parents = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p3}), frozenset({p4, p3})))
-            if are_eq_angle:
+            are_eq_angle1, parents1 = self.are_angles_equal((frozenset({p3, p1}), frozenset({p4, p1})), (frozenset({p3, p2}), frozenset({p4, p2})))
+            are_eq_angle2, parents2 = self.are_angles_equal((frozenset({p2, p1}), frozenset({p4, p1})), (frozenset({p2, p3}), frozenset({p4, p3})))
+            are_eq_angle3, parents3 = self.are_angles_equal((frozenset({p2, p1}), frozenset({p3, p1})), (frozenset({p2, p4}), frozenset({p3, p4})))
+            are_eq_angle4, parents4 = self.are_angles_equal((frozenset({p1, p2}), frozenset({p4, p2})), (frozenset({p1, p3}), frozenset({p2, p3})))
+            are_eq_angle5, parents5 = self.are_angles_equal((frozenset({p1, p2}), frozenset({p3, p2})), (frozenset({p1, p4}), frozenset({p3, p4})))
+            are_eq_angle6, parents6 = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p4}), frozenset({p2, p4})))
+            
+            if are_eq_angle1:
                 new_relations.append(Cyclic(
                     p1, p2, p3, p4,
-                    parents=parents,
+                    parents=parents1,
+                    rule="eqangleABCADC__cyclicABCD"
+                ))
+            elif are_eq_angle2:
+                new_relations.append(Cyclic(
+                    p1, p2, p3, p4,
+                    parents=parents2,
+                    rule="eqangleABCADC__cyclicABCD"
+                ))
+            elif are_eq_angle3:
+                new_relations.append(Cyclic(
+                    p1, p2, p3, p4,
+                    parents=parents3,
+                    rule="eqangleABCADC__cyclicABCD"
+                ))
+            elif are_eq_angle4:
+                new_relations.append(Cyclic(
+                    p1, p2, p3, p4,
+                    parents=parents4,
+                    rule="eqangleABCADC__cyclicABCD"
+                ))
+            elif are_eq_angle5:
+                new_relations.append(Cyclic(
+                    p1, p2, p3, p4,
+                    parents=parents5,
+                    rule="eqangleABCADC__cyclicABCD"
+                ))
+            elif are_eq_angle6:
+                new_relations.append(Cyclic(
+                    p1, p2, p3, p4,
+                    parents=parents6,
                     rule="eqangleABCADC__cyclicABCD"
                 ))
 

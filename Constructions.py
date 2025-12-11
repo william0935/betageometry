@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 from typing import Dict, Tuple
 import numpy as np
 from relations import *
+import re, inspect
 
 plt.style.use("seaborn-v0_8-whitegrid")  # clean white background
 
@@ -14,25 +15,84 @@ class Canva:
         self.fig, self.ax = setup_geometry_plot()
         self.points = points
         self.points_dict = points_dict
-        self.auxiliary_points = []
-        self.auxiliary_points_dict = {}
         self.lines = lines
         self.circles = circles
         self.auxiliary_counter = 1
+        self.dict = {}
+        for p in points:
+            self.dict[p.name] = p
 
     def plot(self):
         plot_points(self.ax, self.points_dict)
-        plot_points(self.ax, self.auxiliary_points_dict)
         plot_lines_from_eq(self.ax, self.lines)
         plot_circles_from_eq(self.ax, self.circles)
         plt.show()
+    
+    def apply_llm_construction(self, call: str):
+        """
+        Parse a string like "midpoint(A, B)" or "incenter(A, B, C)", resolve point names
+        using self.points (and self.points_dict as fallback), validate the method name
+        and arity, then call the method and return its exact return value.
 
+        On error returns None, [] to match other construction methods.
+        """
+
+        # parse function name and arg list
+        m = re.match(r'^\s*([A-Za-z_]\w*)\s*\((.*)\)\s*$', call.strip())
+        if not m:
+            return None, []
+
+        func_name, args_str = m.group(1), m.group(2).strip()
+
+        # split args (simple comma split; assumes no nested commas inside args)
+        args = []
+        if args_str != "":
+            args = [a.strip() for a in args_str.split(',') if a.strip() != ""]
+
+        # resolve tokens to actual objects to pass to the method
+        resolved_args = []
+        for tok in args:
+            # if token is a known point object name, use it
+            if tok in self.dict:
+                resolved_args.append(self.dict[tok])
+            else:
+                return None, []
+
+        # find method on self
+        func = getattr(self, func_name, None)
+        if func is None or not callable(func):
+            return None, []
+
+        # validate signature (positional args)
+        try:
+            sig = inspect.signature(func)
+        except ValueError:
+            # builtins or C functions may fail to provide signature; attempt to call and catch TypeError
+            sig = None
+
+        if sig is not None:
+            params = [p for p in sig.parameters.values() if p.name != 'self' and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+            has_var = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
+            min_args = sum(1 for p in params if p.default is inspect._empty)
+            max_args = float('inf') if has_var else len(params)
+            if not (min_args <= len(resolved_args) <= max_args):
+                return None, []
+
+        # attempt call
+        try:
+            return func(*resolved_args)
+        except TypeError:
+            return None, []
+        except Exception:
+            return None, []
+    
     def add_point(self, x: float, y: float) -> Point:
         name = "X" + str(self.auxiliary_counter)
         self.auxiliary_counter += 1
         p = Point(name, x, y)
-        self.auxiliary_points.append(p)
-        self.auxiliary_points_dict[name] = (x, y)
+        self.points.append(p)
+        self.points_dict[name] = (x, y)
+        self.dict[name] = p
         return p
 
     def free(self) -> Point:

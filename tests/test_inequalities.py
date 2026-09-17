@@ -10,12 +10,7 @@ import math
 
 import pytest
 
-from ar_inequalities import (
-    AngleInequalityTable,
-    InequalityTable,
-    SegmentInequalityTable,
-    nonneg_combination,
-)
+from ar_inequalities import InequalityTable, nonneg_combination
 from constructions import Canva
 from dd_ar import DDWithAR
 from problem import Problem
@@ -81,6 +76,98 @@ def test_strict_conclusion_needs_a_strict_premise():
                        inequalities=[([1, -1, 0], False), ([0, 1, -1], False)])
     assert table.implies([1, 0, -1], strict=False)[0], "a >= b >= c gives a >= c"
     assert not table.implies([1, 0, -1], strict=True)[0], "but not a > c"
+
+
+@pytest.mark.parametrize("strict_first", [True, False])
+def test_strict_premise_survives_a_competing_weak_chain(strict_first):
+    """A strict premise must not be masked by a weak route to the same conclusion.
+
+    `a > c` is stated outright, so it is trivially provable. But `a >= b >= c` reaches
+    the same row using no strict premise, and a solver that returns whichever certificate
+    it finds and only then asks whether that one happened to be strict will answer with
+    the weak chain and call `a > c` unprovable. Which certificate comes back depends on
+    the pivot order, so the same facts are given in both orders.
+    """
+    strict = RelationNode("gtseg", 1, ("k", 1))
+    weak1 = RelationNode("gteseg", 2, ("k", 2))
+    weak2 = RelationNode("gteseg", 3, ("k", 3))
+    rows = [([1, 0, -1], strict, True),
+            ([1, -1, 0], weak1, False),
+            ([0, 1, -1], weak2, False)]
+    if not strict_first:
+        rows.reverse()
+
+    table = InequalityTable(["a", "b", "c"])
+    for row, source, is_strict in rows:
+        table.add_inequality(row, source, strict=is_strict)
+
+    proved, used = table.implies([1, 0, -1], strict=True)
+    assert proved, "a > c is a premise and must be provable"
+    assert used == {strict}, "the certificate has to rest on the strict premise"
+
+
+def test_a_strict_proof_may_mix_strict_and_weak_rows():
+    """The two tables are stored apart but searched together.
+
+    `a > b` and `b >= c` give `a > c`, drawing one row from each, so the strict table
+    can never be queried on its own.
+    """
+    strict = RelationNode("gtseg", 1, ("k", 1))
+    weak = RelationNode("gteseg", 2, ("k", 2))
+    table = InequalityTable(["a", "b", "c"])
+    table.add_inequality([1, -1, 0], strict, strict=True)
+    table.add_inequality([0, 1, -1], weak, strict=False)
+
+    proved, used = table.implies([1, 0, -1], strict=True)
+    assert proved
+    assert used == {strict, weak}
+
+
+def test_strict_and_weak_rows_are_stored_separately():
+    strict = RelationNode("gtseg", 1, ("k", 1))
+    weak = RelationNode("gteseg", 2, ("k", 2))
+    table = InequalityTable(["a", "b"])
+    table.add_inequality([1, -1], strict, strict=True)
+    table.add_inequality([-1, 1], weak, strict=False)
+
+    assert table.strict_rows == [[1, -1]] and table.strict_source == [strict]
+    assert table.weak_rows == [[-1, 1]] and table.weak_source == [weak]
+
+    table.clear_rows()
+    assert not table.strict_rows and not table.weak_rows and not table.eq_rows
+    assert table.header == ["a", "b"], "clearing rows must keep the columns"
+
+
+def test_weighting_never_changes_whether_a_combination_exists():
+    """Asking for a strict-leaning certificate must not alter what is derivable."""
+    import random
+
+    rng = random.Random(5)
+    for _ in range(200):
+        ncol = rng.randint(1, 4)
+        rows = [[rng.randint(-2, 2) for _ in range(ncol)]
+                for _ in range(rng.randint(1, 4))]
+        eqs = [[rng.randint(-2, 2) for _ in range(ncol)]
+               for _ in range(rng.randint(0, 2))]
+        target = [rng.randint(-3, 3) for _ in range(ncol)]
+        weights = [1.0] * len(rows)
+
+        plain = nonneg_combination(rows, eqs, target)
+        weighted = nonneg_combination(rows, eqs, target, weights=weights)
+        assert (plain is None) == (weighted is None), \
+            f"weighting changed feasibility: {rows} {eqs} {target}"
+        if weighted is None:
+            continue
+        lambdas, mus = weighted
+        assert all(c > -1e-9 for c in lambdas), "coefficients must stay non-negative"
+        rebuilt = [0.0] * ncol
+        for c, row in zip(lambdas, rows):
+            for i in range(ncol):
+                rebuilt[i] += c * row[i]
+        for c, row in zip(mus, eqs):
+            for i in range(ncol):
+                rebuilt[i] += c * row[i]
+        assert all(abs(rebuilt[i] - target[i]) < 1e-6 for i in range(ncol))
 
 
 def test_empty_table_proves_nothing():
@@ -238,6 +325,43 @@ def test_non_strict_premise_does_not_prove_the_strict_goal():
     a, b, c = scalene()
     problem = solve_ineq((a, b, c), [GreaterEqSegment(a, b, a, c)],
                          [GreaterSegment(a, b, a, c)])
+    assert not problem.solved
+
+
+def test_strict_goal_survives_a_weak_chain_end_to_end():
+    """A strict premise competing with a weak chain, driven through the full engine.
+
+    |AB| > |AD| is stated, and |AB| >= |AC| >= |AD| offers a weak route to the same row.
+    The larger-side-faces-larger-angle rule needs the *strict* comparison, so it only
+    fires if the strict premise is not masked by the weak chain.
+
+    This is a guard rather than a reproducer: `seed_inequality_tables` loads the strict
+    rows first, so the old post-hoc strictness check happened to survive this particular
+    figure. The reproducers are the table-level tests above, which fix the row order
+    directly.
+    """
+    a = Point("A", 0.0, 0.0)
+    b = Point("B", 6.0, 0.0)
+    c = Point("C", 1.0, 3.0)     # |AC| ~ 3.16
+    d = Point("D", 2.0, 1.0)     # |AD| ~ 2.24
+    problem = solve_ineq((a, b, c, d),
+                         [GreaterEqSegment(a, b, a, c),
+                          GreaterEqSegment(a, c, a, d),
+                          GreaterSegment(a, b, a, d)],
+                         [GreaterAngle(a, d, b, a, b, d)])
+    assert problem.solved
+
+
+def test_a_weak_chain_alone_still_proves_nothing_strict():
+    """The mirror image: with no strict premise the same goal must stay out of reach."""
+    a = Point("A", 0.0, 0.0)
+    b = Point("B", 6.0, 0.0)
+    c = Point("C", 1.0, 3.0)
+    d = Point("D", 2.0, 1.0)
+    problem = solve_ineq((a, b, c, d),
+                         [GreaterEqSegment(a, b, a, c),
+                          GreaterEqSegment(a, c, a, d)],
+                         [GreaterAngle(a, d, b, a, b, d)])
     assert not problem.solved
 
 

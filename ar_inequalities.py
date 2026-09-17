@@ -18,9 +18,19 @@ than per direction.
 Rows are kept even when linearly dependent on rows already present. `Table` drops those
 as redundant, which is right for equalities and lossy here: `a >= b` and `b >= a` are
 linearly dependent but together prove `a == b`.
+
+Strict (`>`) and non-strict (`>=`) rows are held in separate tables. A strict conclusion
+needs a combination that puts real weight on a strict premise -- a sum of non-strict rows
+can only ever prove a non-strict claim -- but the two are not otherwise independent, and
+querying the strict table alone would be wrong: `a > b` together with `b >= c` is a
+perfectly good strict proof of `a > c`, and it draws a row from each. So the split is not
+two separate searches but one search that is *told* to lean on the strict table, and the
+distinction is enforced while choosing the certificate rather than checked afterwards.
+Checking afterwards loses real derivations: with `a >= b`, `b >= c` and `a > c` all known,
+a solver free to return any certificate may answer `a >= b >= c`, which uses no strict row,
+and `a > c` would be reported unprovable although it was a premise.
 """
 
-import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -34,7 +44,9 @@ _EPS = 1e-9
 def nonneg_combination(nonneg_rows: Sequence[Sequence[float]],
                        free_rows: Sequence[Sequence[float]],
                        target: Sequence[float],
-                       tol: float = 1e-9) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+                       tol: float = 1e-9,
+                       weights: Optional[Sequence[float]] = None
+                       ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
     """Express `target` as a combination of the given rows, or return None.
 
     The coefficients on `nonneg_rows` are constrained to be >= 0; those on `free_rows`
@@ -45,6 +57,12 @@ def nonneg_combination(nonneg_rows: Sequence[Sequence[float]],
     free rows appear as a difference of two non-negative columns -- solved with a
     phase-1 simplex. Bland's rule is used for pivot selection: it is slower than a
     steepest-edge rule but cannot cycle, and these systems are tiny.
+
+    With `weights`, one per non-negative row, the search does not stop at the first
+    combination it finds: a phase-2 pass then maximises `weights . lambdas`, so among all
+    the certificates that exist the one returned carries as much weight as possible on
+    the rows the caller cares about. `InequalityTable.implies` uses this to ask for a
+    certificate that actually rests on a strict premise.
     """
     n_cols = len(target)
     k_nonneg = len(nonneg_rows)
@@ -64,7 +82,12 @@ def nonneg_combination(nonneg_rows: Sequence[Sequence[float]],
     matrix = np.column_stack(columns) if columns else np.zeros((n_cols, 0))
     rhs = np.asarray(target, dtype=float)
 
-    solution = _phase_one_simplex(matrix, rhs, tol=tol)
+    objective = None
+    if weights is not None:
+        objective = np.zeros(matrix.shape[1])
+        objective[:k_nonneg] = np.asarray(weights, dtype=float)
+
+    solution = _simplex(matrix, rhs, objective=objective, tol=tol)
     if solution is None:
         return None
 
@@ -73,9 +96,58 @@ def nonneg_combination(nonneg_rows: Sequence[Sequence[float]],
     return lambdas, mus
 
 
-def _phase_one_simplex(matrix: np.ndarray, rhs: np.ndarray,
-                       tol: float = 1e-9, max_iter: int = 10000) -> Optional[np.ndarray]:
-    """Find z >= 0 with `matrix @ z == rhs`, or None if none exists."""
+def _pivot(tableau: np.ndarray, basis: List[int], row: int, col: int):
+    """Make `col` basic in `row`, by Gauss-Jordan on the tableau."""
+    tableau[row, :] /= tableau[row, col]
+    for i in range(tableau.shape[0]):
+        if i != row and tableau[i, col] != 0.0:
+            tableau[i, :] -= tableau[i, col] * tableau[row, :]
+    basis[row] = col
+
+
+def _pivot_to_optimal(tableau: np.ndarray, basis: List[int], cost: np.ndarray,
+                      n_cols: int, tol: float, max_iter: int) -> int:
+    """Minimise `cost` over the first `n_cols` columns, in place.
+
+    Returns -1 once no reduced cost is negative, or the index of a column along which
+    the objective falls without bound.
+    """
+    m = tableau.shape[0]
+    for _ in range(max_iter):
+        # Bland's rule: the lowest-indexed column with a negative reduced cost.
+        entering = -1
+        for j in range(n_cols):
+            if cost[j] < -tol:
+                entering = j
+                break
+        if entering == -1:
+            return -1  # optimal
+
+        column = tableau[:, entering]
+        # Ratio test, breaking ties on the lowest basis index (Bland).
+        leaving, best_ratio = -1, None
+        for i in range(m):
+            if column[i] > tol:
+                ratio = tableau[i, -1] / column[i]
+                if best_ratio is None or ratio < best_ratio - tol or \
+                   (abs(ratio - best_ratio) <= tol and basis[i] < basis[leaving]):
+                    leaving, best_ratio = i, ratio
+        if leaving == -1:
+            return entering  # unbounded along this column
+
+        coeff = cost[entering]
+        _pivot(tableau, basis, leaving, entering)
+        if abs(coeff) > tol:
+            cost -= coeff * tableau[leaving, :]
+    return -1
+
+
+def _phase_one(matrix: np.ndarray, rhs: np.ndarray, tol: float, max_iter: int):
+    """Find a feasible basis for z >= 0, `matrix @ z == rhs`.
+
+    Returns `(tableau, basis, n)` with the artificial columns already removed, or None
+    if the system is infeasible.
+    """
     m, n = matrix.shape
     a = matrix.astype(float).copy()
     b = rhs.astype(float).copy()
@@ -96,64 +168,115 @@ def _phase_one_simplex(matrix: np.ndarray, rhs: np.ndarray,
     cost[:n] = -a.sum(axis=0)
     cost[n + m] = -b.sum()
 
-    for _ in range(max_iter):
-        # Bland's rule: the lowest-indexed column with a negative reduced cost.
-        entering = -1
-        for j in range(n + m):
-            if cost[j] < -tol:
-                entering = j
-                break
-        if entering == -1:
-            break  # optimal
-
-        column = tableau[:, entering]
-        # Ratio test, breaking ties on the lowest basis index (Bland).
-        leaving, best_ratio = -1, None
-        for i in range(m):
-            if column[i] > tol:
-                ratio = tableau[i, -1] / column[i]
-                if best_ratio is None or ratio < best_ratio - tol or \
-                   (abs(ratio - best_ratio) <= tol and basis[i] < basis[leaving]):
-                    leaving, best_ratio = i, ratio
-        if leaving == -1:
-            break  # unbounded along this column, which cannot happen in phase 1
-
-        pivot = tableau[leaving, entering]
-        tableau[leaving, :] /= pivot
-        for i in range(m):
-            if i != leaving and abs(tableau[i, entering]) > tol:
-                tableau[i, :] -= tableau[i, entering] * tableau[leaving, :]
-        if abs(cost[entering]) > tol:
-            cost -= cost[entering] * tableau[leaving, :]
-        basis[leaving] = entering
+    _pivot_to_optimal(tableau, basis, cost, n + m, tol, max_iter)
 
     # The objective value is -cost[-1]; feasible exactly when every artificial is zero.
     if -cost[n + m] > tol * max(1.0, float(np.abs(b).sum())):
         return None
 
-    solution = np.zeros(n + m)
+    # An artificial may still be basic at a zero level. Pivot each one out on any
+    # structural column with a non-zero entry in its row; a row with none is redundant
+    # and is dropped. Leaving one basic would let phase 2 raise it off zero, which
+    # silently breaks feasibility -- the ratio test only guards rows whose entry in the
+    # entering column is positive.
+    redundant = []
+    for i in range(m):
+        if basis[i] < n:
+            continue
+        col = -1
+        for j in range(n):
+            if abs(tableau[i, j]) > tol:
+                col = j
+                break
+        if col == -1:
+            redundant.append(i)
+        else:
+            _pivot(tableau, basis, i, col)
+    if redundant:
+        drop = set(redundant)
+        keep = [i for i in range(m) if i not in drop]
+        tableau = tableau[keep, :]
+        basis = [basis[i] for i in keep]
+
+    # Drop the artificial columns; nothing downstream may reintroduce them.
+    tableau = np.hstack([tableau[:, :n], tableau[:, -1:]])
+    return tableau, basis, n
+
+
+def _simplex(matrix: np.ndarray, rhs: np.ndarray,
+             objective: Optional[np.ndarray] = None,
+             tol: float = 1e-9, max_iter: int = 10000) -> Optional[np.ndarray]:
+    """Find z >= 0 with `matrix @ z == rhs`, or None if none exists.
+
+    With `objective`, the solution returned maximises `objective . z` rather than being
+    whichever feasible point phase 1 happened to stop at.
+    """
+    found = _phase_one(matrix, rhs, tol=tol, max_iter=max_iter)
+    if found is None:
+        return None
+    tableau, basis, n = found
+
+    extra = None
+    if objective is not None:
+        extra = _phase_two(tableau, basis, n, np.asarray(objective, dtype=float),
+                           tol=tol, max_iter=max_iter)
+
+    solution = np.zeros(n)
     for i, var in enumerate(basis):
-        solution[var] = tableau[i, -1]
-    if np.any(solution[n:] > tol):
-        return None  # an artificial stayed in the basis at a non-zero level
-    return solution[:n]
+        if var < n:
+            solution[var] = tableau[i, -1]
+    if extra is not None:
+        col, value = extra
+        solution[col] += value
+    return solution
+
+
+def _phase_two(tableau: np.ndarray, basis: List[int], n: int, objective: np.ndarray,
+               tol: float, max_iter: int) -> Optional[Tuple[int, float]]:
+    """Maximise `objective . z` from a feasible basis, in place.
+
+    Returns None normally, or `(column, value)` for a non-basic variable that has to be
+    added to the basic solution when the objective turned out to be unbounded.
+    """
+    # The pivot loop minimises, so it is handed the negated objective.
+    d = -objective
+    cost = np.zeros(n + 1)
+    cost[:n] = d
+    for i, var in enumerate(basis):
+        if d[var] != 0.0:
+            cost -= d[var] * tableau[i, :]
+
+    unbounded_col = _pivot_to_optimal(tableau, basis, cost, n, tol, max_iter)
+    if unbounded_col < 0:
+        return None
+
+    # The objective grows without bound along this column, so any positive step gives a
+    # certificate worth more than the current one. A single unit is enough: the caller
+    # only needs to know the weight it asked about can be made positive. Every entry of
+    # the column is <= 0, so the basic variables only increase and stay feasible.
+    step = 1.0
+    tableau[:, -1] -= step * tableau[:, unbounded_col]
+    return unbounded_col, step
 
 
 class InequalityTable:
     """Linear inequalities over a set of named columns.
 
-    Every stored row means ``coefficients . x >= 0``, or ``> 0`` when `strict`.
-    Equalities (``== 0``) are stored separately, since their coefficients may be scaled
-    in either direction when combining.
+    Every stored row means ``coefficients . x >= 0``, or ``> 0`` when `strict`. Strict and
+    non-strict rows are kept in separate tables so that a strict query can require the
+    certificate to draw on the strict one; see the module docstring. Equalities (``== 0``)
+    are separate again, since their coefficients may be scaled in either direction when
+    combining.
     """
 
     def __init__(self, header: Optional[List[Any]] = None):
         self.header: List[Any] = list(header) if header else []
         self.col_id: Dict[Any, int] = {c: i for i, c in enumerate(self.header)}
-        # Parallel lists: coefficients, strictness, and the relation that supplied it.
-        self.ineq_rows: List[List[float]] = []
-        self.ineq_strict: List[bool] = []
-        self.ineq_source: List[RelationNode] = []
+        # Parallel lists of coefficients and the relation that supplied each row.
+        self.strict_rows: List[List[float]] = []
+        self.strict_source: List[RelationNode] = []
+        self.weak_rows: List[List[float]] = []
+        self.weak_source: List[RelationNode] = []
         self.eq_rows: List[List[float]] = []
         self.eq_source: List[RelationNode] = []
 
@@ -166,29 +289,42 @@ class InequalityTable:
     def table_length(self) -> int:
         return len(self.header)
 
+    def clear_rows(self):
+        """Drop every row, keeping the columns.
+
+        `DDWithAR` reseeds the tables after each deduction pass; the header is left alone
+        so column ids stay stable across passes.
+        """
+        self.strict_rows, self.strict_source = [], []
+        self.weak_rows, self.weak_source = [], []
+        self.eq_rows, self.eq_source = [], []
+
     def _widen(self, row: Sequence[float]) -> List[float]:
         row = list(row)
         return row + [0.0] * (len(self.header) - len(row))
 
+    def _padded(self, rows: List[List[float]]) -> List[List[float]]:
+        """Rows stored before the header grew still have to reach its full width."""
+        return [self._widen(r) for r in rows]
+
     def add_inequality(self, row: Sequence[float], relation: RelationNode,
                        strict: bool = True):
-        """Record ``row . x >= 0`` (or ``> 0``).
+        """Record ``row . x >= 0`` (or ``> 0``), in whichever table matches.
 
         Unlike `ar.Table`, a row that is linearly dependent on existing rows is still
         kept: `a >= b` alongside `b >= a` is dependent but carries real information.
         """
-        self.ineq_rows.append(self._widen(row))
-        self.ineq_strict.append(strict)
-        self.ineq_source.append(relation)
+        if strict:
+            self.strict_rows.append(self._widen(row))
+            self.strict_source.append(relation)
+        else:
+            self.weak_rows.append(self._widen(row))
+            self.weak_source.append(relation)
 
     def add_equality(self, row: Sequence[float], relation: RelationNode):
         """Record ``row . x == 0``, usable with a coefficient of either sign."""
         self.eq_rows.append(self._widen(row))
         self.eq_source.append(relation)
-
-    def _padded(self, rows: List[List[float]]) -> List[List[float]]:
-        width = len(self.header)
-        return [r + [0.0] * (width - len(r)) for r in rows]
 
     def implies(self, row: Sequence[float], strict: bool = True,
                 tol: float = 1e-9) -> Tuple[bool, frozenset]:
@@ -197,26 +333,37 @@ class InequalityTable:
         Returns `(proved, sources)` to match `ar.Table.is_spanned`, so callers and the
         proof trace treat both tables the same way.
         """
-        if not self.ineq_rows and not self.eq_rows:
+        if not (self.strict_rows or self.weak_rows or self.eq_rows):
             return False, frozenset()
+        if strict and not self.strict_rows:
+            return False, frozenset()  # nothing that could make the conclusion strict
 
         target = self._widen(row)
-        nonneg = self._padded(self.ineq_rows)
+        # A strict row serves as a non-strict one too -- `a > b` gives `a >= b` -- so both
+        # tables go to the search. It is the weighting below, not the choice of rows, that
+        # separates a strict conclusion from a non-strict one.
+        n_strict = len(self.strict_rows)
+        nonneg = self._padded(self.strict_rows) + self._padded(self.weak_rows)
         free = self._padded(self.eq_rows)
 
-        result = nonneg_combination(nonneg, free, target, tol=tol)
+        # For a strict goal, ask for the certificate leaning hardest on the strict table;
+        # if even that puts no weight there, no certificate does. See the module docstring
+        # for why this cannot be decided after the certificate is chosen.
+        weights = [1.0] * n_strict + [0.0] * len(self.weak_rows) if strict else None
+
+        result = nonneg_combination(nonneg, free, target, tol=tol, weights=weights)
         if result is None:
             return False, frozenset()
 
         lambdas, mus = result
-        used_ineq = [i for i, v in enumerate(lambdas) if v > _EPS]
-
-        # A strict conclusion needs at least one strict premise pulling its weight. A
-        # sum of non-strict inequalities can only ever prove a non-strict one.
-        if strict and not any(self.ineq_strict[i] for i in used_ineq):
+        if strict and float(np.sum(lambdas[:n_strict])) <= _EPS:
             return False, frozenset()
 
-        sources = {self.ineq_source[i] for i in used_ineq}
+        sources = set()
+        for i, value in enumerate(lambdas):
+            if value > _EPS:
+                sources.add(self.strict_source[i] if i < n_strict
+                            else self.weak_source[i - n_strict])
         sources |= {self.eq_source[j] for j, v in enumerate(mus) if abs(v) > _EPS}
         return True, frozenset(s for s in sources if s is not None)
 

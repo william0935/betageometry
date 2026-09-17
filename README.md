@@ -99,6 +99,16 @@ They have to be separate tables rather than another `Table`, for two reasons:
   exists at all, since adding 180° flips any comparison. The angle inequality table has
   one column per angle *magnitude*.
 
+Strict (`>`) and non-strict (`>=`) rows are held in separate tables, because a strict
+conclusion needs a combination that puts real weight on a strict premise — a sum of
+non-strict rows only ever proves a non-strict claim. The two are not searched separately
+though: `a > b` with `b >= c` proves `a > c` and draws a row from each. So a strict query
+asks the LP for the certificate that leans hardest on the strict table, and concludes `>`
+only if that one still rests on it. Deciding this *after* picking a certificate would make
+the answer depend on which vertex the simplex landed on — with `a >= b`, `b >= c` and
+`a > c` all known, a solver free to return any certificate answers `a >= b >= c`, and
+`a > c` is reported unprovable although it was a premise.
+
 Known equalities are fed in as free-sign rows, so `cong A D A E` combines with
 `gtseg A B A D` to give `gtseg A B A E`. Rules that only run in this mode: the triangle
 inequality (as an axiom), larger-side-faces-larger-angle and its converse, and the hinge

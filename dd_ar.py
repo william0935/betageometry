@@ -10,7 +10,6 @@ from ar import *
 from ar_inequalities import (
     AngleInequalityTable,
     SegmentInequalityTable,
-    angle_key,
     segment_key,
 )
 from constructions import *
@@ -303,10 +302,8 @@ h1,h2 { color: #333; }
         seg_table = self.segment_ineq_table
         ang_table = self.angle_ineq_table
 
-        seg_table.ineq_rows, seg_table.ineq_strict, seg_table.ineq_source = [], [], []
-        seg_table.eq_rows, seg_table.eq_source = [], []
-        ang_table.ineq_rows, ang_table.ineq_strict, ang_table.ineq_source = [], [], []
-        ang_table.eq_rows, ang_table.eq_source = [], []
+        seg_table.clear_rows()
+        ang_table.clear_rows()
 
         for cong in self.problem.relations.get("cong", []):
             p1, p2, p3, p4 = cong.points

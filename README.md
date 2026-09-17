@@ -17,6 +17,7 @@ answers "which extra point should I draw?", and a bad answer costs time, not sou
 | `constructions.py` | `Canva` — the constructions that can draw a new point |
 | `ar.py` | Algebraic reasoning: linear tables over segments and angles |
 | `dd_ar.py` | The deductive engine — rules plus AR |
+| `ar_inequalities.py` | Inequality tables — addition-only reasoning, lazily activated |
 | `rabbits.py` | The construction vocabulary, the parser, and the proposer interface |
 | `gemma.py` | Gemma-backed proposer, and the shared prompt format |
 | `search.py` | The solve loop: deduce, propose a point, deduce again |
@@ -69,6 +70,39 @@ Statements use the predicate DSL, assumptions then goal:
 ```text
 circle O B R D; cong O B O Y; col B O D; eqangle B O R Y O D; ? contri2 R B D Y D B
 ```
+
+### Inequalities
+
+Four extra predicates compare lengths and angle magnitudes:
+
+```text
+gtseg A B C D        |AB| >  |CD|          gtangle A B C D E F   angle ABC >  angle DEF
+gteseg A B C D       |AB| >= |CD|          gteangle A B C D E F  angle ABC >= angle DEF
+```
+
+```text
+gtseg A B A C; ? gtangle A C B A B C        # larger side faces the larger angle
+```
+
+These are handled by their own tables in `ar_inequalities.py`, built **only if the
+statement mentions an inequality** — a problem without one pays nothing, and the
+inequality rules are not even loaded.
+
+They have to be separate tables rather than another `Table`, for two reasons:
+
+- **Only addition is allowed.** `Table` tests whether a row lies in the *span* of its
+  rows, which permits any real coefficient. Scaling an inequality by a negative number
+  reverses it, so a span test concludes `CD > AB` from `AB > CD`. The inequality tables
+  instead look for a combination with non-negative coefficients on the inequality rows
+  (equalities may still take either sign) — Farkas' lemma, solved as a small LP.
+- **The columns differ.** `AngleTable` works in directions modulo pi, where no ordering
+  exists at all, since adding 180° flips any comparison. The angle inequality table has
+  one column per angle *magnitude*.
+
+Known equalities are fed in as free-sign rows, so `cong A D A E` combines with
+`gtseg A B A D` to give `gtseg A B A E`. Rules that only run in this mode: the triangle
+inequality (as an axiom), larger-side-faces-larger-angle and its converse, and the hinge
+theorem.
 
 ## Generate training data
 

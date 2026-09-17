@@ -412,3 +412,136 @@ class EqArea(RelationNode):
         )
 
         self.points = [p1, p2, p3, p4, p5, p6]
+
+
+# Inequalities.
+#
+# Unlike every predicate above, these are *directed*: `gtseg A B C D` and
+# `gtseg C D A B` are contradictory, not interchangeable, so the relation key is an
+# ordered tuple rather than a frozenset of both sides.
+#
+# They carry no `equivalent` relations. A strict inequality implies its non-strict
+# counterpart, but expanding that here would put both in the database and let a rule
+# that needs the strict form silently match the weaker one.
+
+class GreaterSegment(RelationNode):
+    "|p1p2| > |p3p4|"
+
+    def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[set[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="gtseg",
+            index=index,
+            relation=(frozenset({p1, p2}), frozenset({p3, p4})),
+            representation=f"gtseg {p1} {p2} {p3} {p4}",
+            parents=parents,
+            rule=rule
+        )
+
+        self.points = [p1, p2, p3, p4]
+
+
+class GreaterEqSegment(RelationNode):
+    "|p1p2| >= |p3p4|"
+
+    def __init__(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[set[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="gteseg",
+            index=index,
+            relation=(frozenset({p1, p2}), frozenset({p3, p4})),
+            representation=f"gteseg {p1} {p2} {p3} {p4}",
+            parents=parents,
+            rule=rule
+        )
+
+        self.points = [p1, p2, p3, p4]
+
+
+class GreaterAngle(RelationNode):
+    "angle p1p2p3 > angle p4p5p6"
+
+    def __init__(self, p1: Point, p2: Point, p3: Point,
+                 p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[set[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="gtangle",
+            index=index,
+            relation=((p2, frozenset({p1, p3})), (p5, frozenset({p4, p6}))),
+            representation=f"gtangle {p1} {p2} {p3} {p4} {p5} {p6}",
+            parents=parents,
+            rule=rule
+        )
+
+        self.points = [p1, p2, p3, p4, p5, p6]
+
+
+class GreaterEqAngle(RelationNode):
+    "angle p1p2p3 >= angle p4p5p6"
+
+    def __init__(self, p1: Point, p2: Point, p3: Point,
+                 p4: Point, p5: Point, p6: Point,
+                 index: Optional[int] = None,
+                 parents: Optional[set[RelationNode]] = None,
+                 rule: Optional[str] = None):
+        super().__init__(
+            name="gteangle",
+            index=index,
+            relation=((p2, frozenset({p1, p3})), (p5, frozenset({p4, p6}))),
+            representation=f"gteangle {p1} {p2} {p3} {p4} {p5} {p6}",
+            parents=parents,
+            rule=rule
+        )
+
+        self.points = [p1, p2, p3, p4, p5, p6]
+
+
+INEQUALITY_TYPES = ("gtseg", "gteseg", "gtangle", "gteangle")
+
+
+def is_inequality(relation: RelationNode) -> bool:
+    return relation.name in INEQUALITY_TYPES
+
+
+def segments_look_greater(p1: Point, p2: Point, p3: Point, p4: Point,
+                          strict: bool = True, tol: float = 1e-9) -> bool:
+    """Does |p1p2| exceed |p3p4| in the diagram?
+
+    A cheap guard in front of the inequality tables, mirroring how the equality
+    predicates screen candidates before the AR work: if the diagram disagrees there is
+    nothing to prove, and a false claim can never be derived from a true diagram.
+    """
+    a = math.hypot(p2.x - p1.x, p2.y - p1.y)
+    b = math.hypot(p4.x - p3.x, p4.y - p3.y)
+    scale = tol * max(1.0, a, b)
+    return a > b + scale if strict else a >= b - scale
+
+
+def angle_magnitude(p1: Point, vertex: Point, p2: Point) -> float:
+    "undirected angle p1-vertex-p2 in radians, in [0, pi]"
+    ax, ay = p1.x - vertex.x, p1.y - vertex.y
+    bx, by = p2.x - vertex.x, p2.y - vertex.y
+    if (ax == 0.0 and ay == 0.0) or (bx == 0.0 and by == 0.0):
+        return float("nan")
+    return math.atan2(abs(ax * by - ay * bx), ax * bx + ay * by)
+
+
+def angles_look_greater(p1: Point, p2: Point, p3: Point,
+                        p4: Point, p5: Point, p6: Point,
+                        strict: bool = True, tol: float = 1e-9) -> bool:
+    """Does angle p1p2p3 exceed angle p4p5p6 in the diagram?
+
+    Magnitudes in [0, pi], not directions modulo pi: ordering is only meaningful for the
+    former, since mod pi one may add 180 degrees and reverse any comparison.
+    """
+    a = angle_magnitude(p1, p2, p3)
+    b = angle_magnitude(p4, p5, p6)
+    if math.isnan(a) or math.isnan(b):
+        return False
+    return a > b + tol if strict else a >= b - tol

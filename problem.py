@@ -7,7 +7,10 @@ from itertools import combinations, permutations
 import numpy as np
 
 RELATION_TYPES = ["cong", "eqangle", "para", "perp", "col", "cyclic", "eqratio",
-                  "simtri1", "simtri2", "contri1", "contri2", "midp", "circle", "eqarea"]
+                  "simtri1", "simtri2", "contri1", "contri2", "midp", "circle", "eqarea",
+                  # Inequalities. Only reasoned about when the statement contains one --
+                  # see DDWithAR.uses_inequalities.
+                  "gtseg", "gteseg", "gtangle", "gteangle"]
 
 class Problem:
     def __init__(self, name: str, points: List[Point],
@@ -139,6 +142,11 @@ class Problem:
         elif relation.name == "contri1" or relation.name == "contri2":
             p1, p2, p3, p4, p5, p6 = relation.points
             return (p1, p2, p3) == (p4, p5, p6)
+        elif relation.name in ("gtseg", "gteseg", "gtangle", "gteangle"):
+            # Comparing a quantity with itself: ">=" is vacuous and ">" is false.
+            # Neither belongs in the database.
+            left, right = relation.relation
+            return left == right
         elif relation.name == "simtri1" or relation.name == "simtri2":
             p1, p2, p3, p4, p5, p6 = relation.points
             return set((p1, p2, p3)) == set((p4, p5, p6)) or \

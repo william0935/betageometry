@@ -7,6 +7,12 @@ from relations import *
 from problem import Problem
 from typing import List, Tuple, Optional
 from ar import *
+from ar_inequalities import (
+    AngleInequalityTable,
+    SegmentInequalityTable,
+    angle_key,
+    segment_key,
+)
 from constructions import *
 
 class DDWithAR:
@@ -18,6 +24,14 @@ class DDWithAR:
         # Debug output. Appending to the HTML file re-reads and rewrites the whole
         # document each time, so it stays off unless explicitly asked for.
         self.dump_tables = dump_tables
+
+        # Inequality reasoning is off unless the statement asks for it. Deciding once,
+        # here, keeps it strictly opt-in: with no inequality in the assumptions or the
+        # goals the tables are never built, the inequality rules never run, and every
+        # existing problem behaves exactly as before.
+        self.uses_inequalities = self._statement_has_inequality()
+        self.segment_ineq_table = SegmentInequalityTable() if self.uses_inequalities else None
+        self.angle_ineq_table = AngleInequalityTable() if self.uses_inequalities else None
 
         # ADD THE NEW RULES HERE
         self.rules = [
@@ -38,6 +52,20 @@ class DDWithAR:
             self.congAPBP_congAQBQ__perpABPQ,
             self.check_collinearity
         ]
+
+        # Rules that can only fire once inequalities are in play. Appended rather than
+        # listed above so that a problem without inequalities does not pay for them.
+        if self.uses_inequalities:
+            self.rules.extend([
+                self.gtsegABAC__gtangleACBABC,
+                self.gtangleACBABC__gtsegABAC,
+                self.congABDE_congACDF_gtangleBACEDF__gtsegBCEF,
+            ])
+
+    def _statement_has_inequality(self) -> bool:
+        """Does the problem mention an inequality anywhere?"""
+        return any(is_inequality(r)
+                   for r in list(self.problem.assumptions) + list(self.problem.goals))
 
     def render_table_html(self, table) -> str:
         """Return an HTML fragment rendering `table` as a labeled HTML table."""
@@ -204,6 +232,9 @@ h1,h2 { color: #333; }
         for area in self.problem.relations.get("eqarea", []):
             self.area_table.add_eqarea(area)
 
+        if self.uses_inequalities:
+            self.seed_inequality_tables()
+
         if self.dump_tables:
             self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
@@ -225,6 +256,11 @@ h1,h2 { color: #333; }
                     if hasattr(new_rel, 'equivalent') and new_rel.equivalent:
                         for equiv_rel in new_rel.equivalent:
                             self.update_AR_tables_with_relation(equiv_rel)
+
+            if self.uses_inequalities:
+                # Ordinary deduction keeps producing congruences and equal angles, which
+                # are premises for inequality reasoning; refresh before the next pass.
+                self.seed_inequality_tables()
 
             if not progress_made:
                 if self.dump_tables:
@@ -250,6 +286,154 @@ h1,h2 { color: #333; }
 
         return self.problem.is_solved()
     
+    """
+    Inequality reasoning starts here. Everything below is unreachable unless the
+    statement mentions an inequality; see `uses_inequalities`.
+    """
+
+    def seed_inequality_tables(self):
+        """Load the inequality tables with everything currently known.
+
+        Both the stated inequalities and the known *equalities* go in: `AB = CD` with
+        `CD > EF` proves `AB > EF`, and the equality rows are what let the two combine.
+        Equality rows may carry a coefficient of either sign, inequality rows may not.
+
+        Called again after each deduction pass, since the rules keep producing relations.
+        """
+        seg_table = self.segment_ineq_table
+        ang_table = self.angle_ineq_table
+
+        seg_table.ineq_rows, seg_table.ineq_strict, seg_table.ineq_source = [], [], []
+        seg_table.eq_rows, seg_table.eq_source = [], []
+        ang_table.ineq_rows, ang_table.ineq_strict, ang_table.ineq_source = [], [], []
+        ang_table.eq_rows, ang_table.eq_source = [], []
+
+        for cong in self.problem.relations.get("cong", []):
+            p1, p2, p3, p4 = cong.points
+            seg_table.add_equality(seg_table.row_for_difference(p1, p2, p3, p4), cong)
+
+        for eqangle in self.problem.relations.get("eqangle", []):
+            p1, p2, p3, p4, p5, p6 = eqangle.points
+            ang_table.add_equality(
+                ang_table.row_for_difference(p1, p2, p3, p4, p5, p6), eqangle)
+
+        for name, strict in (("gtseg", True), ("gteseg", False)):
+            for rel in self.problem.relations.get(name, []):
+                p1, p2, p3, p4 = rel.points
+                seg_table.add_inequality(
+                    seg_table.row_for_difference(p1, p2, p3, p4), rel, strict=strict)
+
+        for name, strict in (("gtangle", True), ("gteangle", False)):
+            for rel in self.problem.relations.get(name, []):
+                p1, p2, p3, p4, p5, p6 = rel.points
+                ang_table.add_inequality(
+                    ang_table.row_for_difference(p1, p2, p3, p4, p5, p6), rel,
+                    strict=strict)
+
+        self._add_triangle_inequality_axioms()
+
+    def _add_triangle_inequality_axioms(self):
+        """|AB| + |BC| > |AC| for every non-collinear triple.
+
+        Unconditionally true, so these rows carry no source relation. Without them the
+        segment table holds only what was stated and can do nothing but chain it; with
+        them it can reason about sums of sides.
+        """
+        table = self.segment_ineq_table
+        for p1, p2, p3 in itertools.combinations(self.problem.points, 3):
+            if points_look_collinear(p1, p2, p3):
+                continue
+            for a, b, c in ((p1, p2, p3), (p2, p3, p1), (p3, p1, p2)):
+                table.ensure_segment(a, b)
+                table.ensure_segment(b, c)
+                table.ensure_segment(a, c)
+                row = [0.0] * table.table_length()
+                row[table.col_id[segment_key(a, b)]] += 1.0
+                row[table.col_id[segment_key(b, c)]] += 1.0
+                row[table.col_id[segment_key(a, c)]] -= 1.0
+                table.add_inequality(row, None, strict=True)
+
+    def are_segments_greater(self, p1: Point, p2: Point, p3: Point, p4: Point,
+                             strict: bool = True) -> Tuple[bool, frozenset]:
+        """Is |p1p2| > |p3p4| (or >=) provable from the inequality table?"""
+        if not self.uses_inequalities:
+            return False, frozenset()
+        if not segments_look_greater(p1, p2, p3, p4, strict):
+            return False, frozenset()
+        table = self.segment_ineq_table
+        return table.implies(table.row_for_difference(p1, p2, p3, p4), strict=strict)
+
+    def are_angles_greater(self, p1: Point, p2: Point, p3: Point,
+                           p4: Point, p5: Point, p6: Point,
+                           strict: bool = True) -> Tuple[bool, frozenset]:
+        """Is angle p1p2p3 > angle p4p5p6 (or >=) provable from the inequality table?"""
+        if not self.uses_inequalities:
+            return False, frozenset()
+        if not angles_look_greater(p1, p2, p3, p4, p5, p6, strict):
+            return False, frozenset()
+        table = self.angle_ineq_table
+        return table.implies(
+            table.row_for_difference(p1, p2, p3, p4, p5, p6), strict=strict)
+
+    def gtsegABAC__gtangleACBABC(self) -> List[RelationNode]:
+        """In a triangle, the larger side faces the larger angle."""
+        new_relations = []
+        for p1, p2, p3 in itertools.permutations(self.problem.points, 3):
+            if points_look_collinear(p1, p2, p3):
+                continue
+            # |p1p2| > |p1p3|  =>  angle(p1 p3 p2) > angle(p1 p2 p3)
+            greater, parents = self.are_segments_greater(p1, p2, p1, p3)
+            if greater:
+                new_relations.append(GreaterAngle(
+                    p1, p3, p2, p1, p2, p3,
+                    parents=parents,
+                    rule="gtsegABAC__gtangleACBABC"
+                ))
+        return new_relations
+
+    def gtangleACBABC__gtsegABAC(self) -> List[RelationNode]:
+        """Converse: the larger angle faces the larger side."""
+        new_relations = []
+        for p1, p2, p3 in itertools.permutations(self.problem.points, 3):
+            if points_look_collinear(p1, p2, p3):
+                continue
+            greater, parents = self.are_angles_greater(p1, p3, p2, p1, p2, p3)
+            if greater:
+                new_relations.append(GreaterSegment(
+                    p1, p2, p1, p3,
+                    parents=parents,
+                    rule="gtangleACBABC__gtsegABAC"
+                ))
+        return new_relations
+
+    def congABDE_congACDF_gtangleBACEDF__gtsegBCEF(self) -> List[RelationNode]:
+        """Hinge theorem: two sides fixed, the wider angle subtends the longer side."""
+        new_relations = []
+        points = self.problem.points
+        for p1, p2, p3 in itertools.permutations(points, 3):
+            if points_look_collinear(p1, p2, p3):
+                continue
+            for q1, q2, q3 in itertools.permutations(points, 3):
+                if (p1, p2, p3) == (q1, q2, q3) or points_look_collinear(q1, q2, q3):
+                    continue
+                cong1_ok, cong1_parents = self.are_segments_congruent(
+                    frozenset({p1, p2}), frozenset({q1, q2}))
+                if not cong1_ok:
+                    continue
+                cong2_ok, cong2_parents = self.are_segments_congruent(
+                    frozenset({p1, p3}), frozenset({q1, q3}))
+                if not cong2_ok:
+                    continue
+                wider, parents = self.are_angles_greater(p2, p1, p3, q2, q1, q3)
+                if not wider:
+                    continue
+                new_relations.append(GreaterSegment(
+                    p2, p3, q2, q3,
+                    parents=parents | cong1_parents | cong2_parents,
+                    rule="congABDE_congACDF_gtangleBACEDF__gtsegBCEF"
+                ))
+        return new_relations
+
     def congMAMB_colMAB__midpointMAB(self) -> List[RelationNode]:
         new_relations = []
         congruences = self.problem.relations.get("cong", [])
@@ -1297,6 +1481,14 @@ h1,h2 { color: #333; }
         elif isinstance(rel, Midpoint):
             mid, p1, p2 = rel.points
             return self.is_midpoint(mid, p1, p2)
+        elif isinstance(rel, (GreaterSegment, GreaterEqSegment)):
+            p1, p2, p3, p4 = rel.points
+            return self.are_segments_greater(p1, p2, p3, p4,
+                                             strict=isinstance(rel, GreaterSegment))
+        elif isinstance(rel, (GreaterAngle, GreaterEqAngle)):
+            p1, p2, p3, p4, p5, p6 = rel.points
+            return self.are_angles_greater(p1, p2, p3, p4, p5, p6,
+                                           strict=isinstance(rel, GreaterAngle))
         else:
             return False, set()
     
@@ -1316,6 +1508,7 @@ h1,h2 { color: #333; }
             self.angle_table.add_perpendicular(rel)
         elif isinstance(rel, EqArea):
             self.area_table.add_eqarea(rel)
+
     
     # checks if two segments are congruent via AR table
     def are_segments_congruent(self, seg1: frozenset, seg2: frozenset) -> Tuple[bool, set[RelationNode]]:

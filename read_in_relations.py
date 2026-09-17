@@ -62,6 +62,14 @@ def get_relation(rel_str, all_points):
         relation = Circle(points[0], points[1], points[2], points[3])
     elif word == 'eqarea':
         relation = EqArea(points[0], points[1], points[2], points[3], points[4], points[5])
+    elif word == 'gtseg':
+        relation = GreaterSegment(points[0], points[1], points[2], points[3])
+    elif word == 'gteseg':
+        relation = GreaterEqSegment(points[0], points[1], points[2], points[3])
+    elif word == 'gtangle':
+        relation = GreaterAngle(points[0], points[1], points[2], points[3], points[4], points[5])
+    elif word == 'gteangle':
+        relation = GreaterEqAngle(points[0], points[1], points[2], points[3], points[4], points[5])
     else:
         raise ValueError(f"Relation type {word} not recognized.")
     

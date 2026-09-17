@@ -1,8 +1,17 @@
-# uv stuff
-*.toml
+__pycache__/
+temp_ggb_extraction/
 uv.lock
 *.html
+*.toml
+*.pyc
+.python-version
+*.lock
+*.zip
+data/
+old_data/
+*.txt
 *.json
+<<<<<<< HEAD
 *.xml
 *.png
 temp_ggb_extraction/
@@ -222,3 +231,7 @@ logs/                    # cluster job logs
 gemma-finetuned-*/       # LoRA adapters
 ar_tables.html
 temp_ggb_extraction/
+=======
+*./gemma-finetuned-geometry/
+*gemma*/
+>>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42

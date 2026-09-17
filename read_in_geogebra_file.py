@@ -271,9 +271,12 @@ def parse_picture(filename: str):
     new_circles = rename_circle_dictionary(circles)
     new_lines = combine_lines_and_segments_dictionaries(lines,segments)
     return points, new_lines, new_circles
+<<<<<<< HEAD:read_in_geogebra_file.py
 
 if __name__ == "__main__":
     x, y, z = parse_picture('test.ggb')
     print(x)
     print(y)
     print(z)
+=======
+>>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42:Read_in_Geogebra_File.py

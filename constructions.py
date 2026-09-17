@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from typing import Dict, Tuple
 import numpy as np
 from relations import *
+import re, inspect
 
 plt.style.use("seaborn-v0_8-whitegrid")  # clean white background
 
@@ -19,12 +20,14 @@ class Canva:
         self.ax = None
         self.points = points
         self.points_dict = points_dict
-        self.auxiliary_points = []
-        self.auxiliary_points_dict = {}
         self.lines = lines
         self.circles = circles
         self.auxiliary_counter = 1
+        self.dict = {}
+        for p in points:
+            self.dict[p.name] = p
 
+<<<<<<< HEAD:constructions.py
     def _ensure_axes(self):
         if self.ax is None:
             self.fig, self.ax = setup_geometry_plot()
@@ -46,7 +49,72 @@ class Canva:
             plt.close(self.fig)
             self.fig = None
             self.ax = None
+=======
+    def plot(self):
+        plot_points(self.ax, self.points_dict)
+        plot_lines_from_eq(self.ax, self.lines)
+        plot_circles_from_eq(self.ax, self.circles)
+        plt.show()
+    
+    def apply_llm_construction(self, call: str):
+        """
+        Parse a string like "midpoint(A, B)" or "incenter(A, B, C)", resolve point names
+        using self.points (and self.points_dict as fallback), validate the method name
+        and arity, then call the method and return its exact return value.
+>>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42:Constructions.py
 
+        On error returns None, [] to match other construction methods.
+        """
+
+        # parse function name and arg list
+        m = re.match(r'^\s*([A-Za-z_]\w*)\s*\((.*)\)\s*$', call.strip())
+        if not m:
+            return None, []
+
+        func_name, args_str = m.group(1), m.group(2).strip()
+
+        # split args (simple comma split; assumes no nested commas inside args)
+        args = []
+        if args_str != "":
+            args = [a.strip() for a in args_str.split(',') if a.strip() != ""]
+
+        # resolve tokens to actual objects to pass to the method
+        resolved_args = []
+        for tok in args:
+            # if token is a known point object name, use it
+            if tok in self.dict:
+                resolved_args.append(self.dict[tok])
+            else:
+                return None, []
+
+        # find method on self
+        func = getattr(self, func_name, None)
+        if func is None or not callable(func):
+            return None, []
+
+        # validate signature (positional args)
+        try:
+            sig = inspect.signature(func)
+        except ValueError:
+            # builtins or C functions may fail to provide signature; attempt to call and catch TypeError
+            sig = None
+
+        if sig is not None:
+            params = [p for p in sig.parameters.values() if p.name != 'self' and p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)]
+            has_var = any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in sig.parameters.values())
+            min_args = sum(1 for p in params if p.default is inspect._empty)
+            max_args = float('inf') if has_var else len(params)
+            if not (min_args <= len(resolved_args) <= max_args):
+                return None, []
+
+        # attempt call
+        try:
+            return func(*resolved_args)
+        except TypeError:
+            return None, []
+        except Exception:
+            return None, []
+    
     def add_point(self, x: float, y: float) -> Point:
         # Skip any name the diagram already uses: add_constructed_point rejects a
         # duplicate name, so a diagram with a point literally called "X1" would
@@ -57,8 +125,9 @@ class Canva:
             name = "X" + str(self.auxiliary_counter)
         self.auxiliary_counter += 1
         p = Point(name, x, y)
-        self.auxiliary_points.append(p)
-        self.auxiliary_points_dict[name] = (x, y)
+        self.points.append(p)
+        self.points_dict[name] = (x, y)
+        self.dict[name] = p
         return p
 
     def free(self) -> Point:
@@ -434,10 +503,15 @@ class Canva:
         return c, [perp, cong]
 
     def tangent2(self, a: Point, o: Point, b: Point) -> Tuple[List[Point], List[RelationNode]]:
-        # tangent from point a to circle with center o passing through b
-        A, O, B = np.array([a.x, a.y]), np.array([o.x, o.y]), np.array([b.x, b.y])
+        """
+        Tangent from point a to circle with center o passing through b.
+        """
+        A = np.array([a.x, a.y])
+        O = np.array([o.x, o.y])
+        B = np.array([b.x, b.y])
         OB = B - O
         r = np.linalg.norm(OB)
+<<<<<<< HEAD:constructions.py
         AO = O - A
         d = np.linalg.norm(AO)
         if r <= 0.0 or d <= r * (1 + 1e-9):
@@ -451,14 +525,43 @@ class Canva:
         # because |o t1| comes out as l.
         T1 = A + AO_norm * (l**2 / d) + perp_dir * (r * l / d)
         T2 = A + AO_norm * (l**2 / d) - perp_dir * (r * l / d)
+=======
+        OA = A - O
+        d = np.linalg.norm(OA)
+
+        # no real tangents if A is inside or on the circle
+        EPS = 1e-12
+        if d <= r + EPS:
+            return [], []
+
+        # unit vector from O to A
+        e = OA / d
+        perp = np.array([-e[1], e[0]])  # unit perpendicular
+
+        # stable computation for the sqrt argument
+        arg = max(0.0, d * d - r * r)
+        l = np.sqrt(arg)
+
+        # correct vector formula for tangent points (measured from O)
+        factor_along = (r * r) / (d * d) * OA
+        factor_perp = (r / d) * l * perp
+
+        T1 = O + factor_along + factor_perp
+        T2 = O + factor_along - factor_perp
+
+>>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42:Constructions.py
         t1 = self.add_point(T1[0], T1[1])
         t2 = self.add_point(T2[0], T2[1])
+
         line_name1 = f"Line_{a.name}{t1.name}"
         line_name2 = f"Line_{a.name}{t2.name}"
         circle_name = f"Circle_{o.name}{b.name}{t1.name}{t2.name}"
+
+        # store line equations (coeffs scaled are fine)
         self.lines[line_name1] = (t1.y - a.y, a.x - t1.x, t1.x * a.y - t1.y * a.x)
         self.lines[line_name2] = (t2.y - a.y, a.x - t2.x, t2.x * a.y - t2.y * a.x)
         self.circles[circle_name] = (o.x, o.y, r)
+
         circle = Circle(o, b, t1, t2, rule="construction")
         perp1 = Perpendicular(a, t1, o, t1, rule="construction")
         perp2 = Perpendicular(a, t2, o, t2, rule="construction")

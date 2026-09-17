@@ -1,3 +1,4 @@
+import math
 from matplotlib import pyplot as plt
 from typing import Dict, Tuple
 import numpy as np
@@ -11,7 +12,11 @@ class Canva:
                  points_dict: Dict[str, Tuple[float, float]], 
                  lines: Dict[str, Tuple[float, float, float]], 
                  circles: Dict[str, Tuple[float, float, float]]):
-        self.fig, self.ax = setup_geometry_plot()
+        # The figure is created on demand rather than here. Data generation builds a
+        # Canva per configuration and never draws any of them; pyplot keeps every figure
+        # alive until it is closed, so eagerly making one leaked a figure per seed.
+        self.fig = None
+        self.ax = None
         self.points = points
         self.points_dict = points_dict
         self.auxiliary_points = []
@@ -20,15 +25,36 @@ class Canva:
         self.circles = circles
         self.auxiliary_counter = 1
 
-    def plot(self):
-        plot_points(self.ax, self.points_dict)
-        plot_points(self.ax, self.auxiliary_points_dict)
-        plot_lines_from_eq(self.ax, self.lines)
-        plot_circles_from_eq(self.ax, self.circles)
-        plt.show()
+    def _ensure_axes(self):
+        if self.ax is None:
+            self.fig, self.ax = setup_geometry_plot()
+        return self.ax
+
+    def plot(self, show: bool = True):
+        ax = self._ensure_axes()
+        plot_points(ax, self.points_dict)
+        plot_points(ax, self.auxiliary_points_dict)
+        plot_lines_from_eq(ax, self.lines)
+        plot_circles_from_eq(ax, self.circles)
+        if show:
+            plt.show()
+        return self.fig
+
+    def close(self):
+        """Release the figure, if one was ever drawn."""
+        if self.fig is not None:
+            plt.close(self.fig)
+            self.fig = None
+            self.ax = None
 
     def add_point(self, x: float, y: float) -> Point:
+        # Skip any name the diagram already uses: add_constructed_point rejects a
+        # duplicate name, so a diagram with a point literally called "X1" would
+        # otherwise abort generation partway through.
         name = "X" + str(self.auxiliary_counter)
+        while name in self.points_dict or name in self.auxiliary_points_dict:
+            self.auxiliary_counter += 1
+            name = "X" + str(self.auxiliary_counter)
         self.auxiliary_counter += 1
         p = Point(name, x, y)
         self.auxiliary_points.append(p)
@@ -66,12 +92,28 @@ class Canva:
             d = Point("temp_d", d[0], d[1])
         if is_collinear(a, b, c) or is_collinear(a, b, d) or is_collinear(c, d, a) or is_collinear(c, d, b):
             return None, []
-        m1 = (a.y - b.y) / (a.x - b.x)
-        m2 = (c.y - d.y) / (c.x - d.x)
-        c1 = a.y - m1 * a.x
-        c2 = c.y - m2 * c.x
-        x = (c1 - c2) / (m2 - m1)
-        y = x * m1 + c1
+
+        # Solved as a determinant rather than by equating slopes. The slope form divides
+        # by (a.x - b.x) and by (m2 - m1), so a vertical line or a parallel pair raised
+        # ZeroDivisionError on plain floats -- and, when the caller passed numpy arrays
+        # (foot/anglebisector/incenter/orthocenter/excenter all do), silently produced a
+        # point at inf/nan instead.
+        d1x, d1y = b.x - a.x, b.y - a.y
+        d2x, d2y = d.x - c.x, d.y - c.y
+        n1 = math.hypot(d1x, d1y)
+        n2 = math.hypot(d2x, d2y)
+        if n1 == 0.0 or n2 == 0.0:
+            return None, []
+        denom = d1x * d2y - d1y * d2x
+        if abs(denom) <= 1e-12 * n1 * n2:
+            return None, []  # parallel (or numerically indistinguishable from it)
+
+        t = ((c.x - a.x) * d2y - (c.y - a.y) * d2x) / denom
+        x = a.x + t * d1x
+        y = a.y + t * d1y
+        if not (math.isfinite(x) and math.isfinite(y)):
+            return None, []
+
         p = self.add_point(x, y)
         col1 = Collinear(a, b, p, rule="construction")
         col2 = Collinear(c, d, p, rule="construction")
@@ -178,9 +220,11 @@ class Canva:
         line1_name = f"Line_{a.name}{I.name}{X.name}"
         line2_name = f"Line_{b.name}{I.name}{Y.name}"
         line3_name = f"Line_{c.name}{I.name}{Z.name}"
-        self.lines[line1_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * A[1] - bisector_dir[1] * A[0])
-        self.lines[line2_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * B[1] - bisector_dir[1] * B[0])
-        self.lines[line3_name] = (bisector_dir[1], -bisector_dir[0], bisector_dir[0] * C[1] - bisector_dir[1] * C[0])
+        # Each bisector is taken through the two points that actually define it. Reusing
+        # `bisector_dir` for all three drew lines 2 and 3 parallel to the A-bisector.
+        self.lines[line1_name] = line_through(a, X)
+        self.lines[line2_name] = line_through(b, Y)
+        self.lines[line3_name] = line_through(c, Z)
         return [I, X, Y, Z], relations + [eqangle1, eqangle2, eqangle3, col1, col2, col3]
     
     def incenter2(self, a: Point, b: Point, c: Point) -> Tuple[List[Point], List[RelationNode]]:
@@ -198,11 +242,13 @@ class Canva:
         perp2 = Perpendicular(a, c, I, Y1, rule="construction")
         perp3 = Perpendicular(b, c, I, X1, rule="construction")
         circle = Circle(I, X1, Y1, Z1, rule="construction")
-        cong = Congruent(I, X1, I, X, rule="construction")
+        # NB: there is no cong(I X1, I X) to add here. X1 is the incircle touch point on
+        # BC while X is where the A-bisector meets BC; those coincide only when AB = AC.
+        # The equal tangent lengths are already carried by `circle`'s equivalent relations.
         circle_name = f"Circle_{I.name}{X1.name}{Y1.name}{Z1.name}"
         self.circles[circle_name] = (I.x, I.y, np.sqrt((X1.x - I.x)**2 + (X1.y - I.y)**2))
-        return [I, X, Y, Z, X1, Y1, Z1], relations + [perp1, perp2, perp3, circle, cong]
-    
+        return [I, X, Y, Z, X1, Y1, Z1], relations + [perp1, perp2, perp3, circle]
+
     def excenter(self, a: Point, b: Point, c: Point) -> Tuple[List[Point], List[RelationNode]]:
         # find the intersection of internal bisector of angle A and external bisectors of angles B and C
         if is_collinear(a, b, c):
@@ -273,10 +319,11 @@ class Canva:
         perp2 = Perpendicular(a, c, I, Y1, rule="construction")
         perp3 = Perpendicular(b, c, I, X1, rule="construction")
         circle = Circle(I, X1, Y1, Z1, rule="construction")
-        cong = Congruent(I, X1, I, X, rule="construction")
+        # As in incenter2: X1 (excircle touch point) and X (bisector foot) are different
+        # points, so no congruence between them holds.
         circle_name = f"Circle_{I.name}{X1.name}{Y1.name}{Z1.name}"
         self.circles[circle_name] = (I.x, I.y, np.sqrt((X1.x - I.x)**2 + (X1.y - I.y)**2))
-        return [I, X, Y, Z, X1, Y1, Z1], relations + [perp1, perp2, perp3, circle, cong]
+        return [I, X, Y, Z, X1, Y1, Z1], relations + [perp1, perp2, perp3, circle]
 
     def centroid(self, a: Point, b: Point, c: Point) -> Tuple[List[Point], List[RelationNode]]:
         if is_collinear(a, b, c):
@@ -302,20 +349,31 @@ class Canva:
         if is_collinear(a, b, c):
             return None, []
         A, B, C = np.array([a.x, a.y]), np.array([b.x, b.y]), np.array([c.x, c.y])
+
+        # The altitude perpendicular to AB runs through C, not through A. Anchoring each
+        # altitude at the wrong vertex put H somewhere else entirely while still
+        # asserting perp(AB, HC) etc., feeding three false relations into the solver.
         AB = B - A
-        AC = C - A
-        perp_A = np.array([-AB[1], AB[0]])
-        perp_A /= np.linalg.norm(perp_A)
-        A_start_point = A - perp_A * 100
-        A_end_point = A + perp_A * 100
+        perp_AB = np.array([-AB[1], AB[0]])
+        perp_AB /= np.linalg.norm(perp_AB)
+        C_start_point = C - perp_AB * 100
+        C_end_point = C + perp_AB * 100
+
         BC = C - B
-        perp_B = np.array([-BC[1], BC[0]])
-        perp_B /= np.linalg.norm(perp_B)
-        B_start_point = B - perp_B * 100
-        B_end_point = B + perp_B * 100
-        H, _ = self.intersect_lines(A_start_point, A_end_point, B_start_point, B_end_point)
+        perp_BC = np.array([-BC[1], BC[0]])
+        perp_BC /= np.linalg.norm(perp_BC)
+        A_start_point = A - perp_BC * 100
+        A_end_point = A + perp_BC * 100
+
+        H, _ = self.intersect_lines(C_start_point, C_end_point, A_start_point, A_end_point)
         if H is None:
             return None, []
+        # In a right triangle the orthocenter is the right-angle vertex, which would make
+        # one of the segments below degenerate.
+        if any(math.isclose(H.x, p.x, abs_tol=1e-9) and math.isclose(H.y, p.y, abs_tol=1e-9)
+               for p in (a, b, c)):
+            return None, []
+
         perp1 = Perpendicular(a, b, H, c, rule="construction")
         perp2 = Perpendicular(b, c, H, a, rule="construction")
         perp3 = Perpendicular(c, a, H, b, rule="construction")
@@ -382,13 +440,17 @@ class Canva:
         r = np.linalg.norm(OB)
         AO = O - A
         d = np.linalg.norm(AO)
-        if d - r < 1e-10:
-            return [], []
+        if r <= 0.0 or d <= r * (1 + 1e-9):
+            return [], []  # A is on or inside the circle: no tangent exists
         l = np.sqrt(d**2 - r**2)
         AO_norm = AO / d
         perp_dir = np.array([-AO_norm[1], AO_norm[0]])
-        T1 = A + AO_norm * (r**2 / d) + perp_dir * (r * l / d)
-        T2 = A + AO_norm * (r**2 / d) - perp_dir * (r * l / d)
+        # Distance from A along AO to the foot of the tangency point is l^2/d, not r^2/d.
+        # With r^2/d the construction lands on the tangency points of a circle of radius
+        # l instead of r: the perpendiculars still hold, but circle(o, b, t1, t2) is false
+        # because |o t1| comes out as l.
+        T1 = A + AO_norm * (l**2 / d) + perp_dir * (r * l / d)
+        T2 = A + AO_norm * (l**2 / d) - perp_dir * (r * l / d)
         t1 = self.add_point(T1[0], T1[1])
         t2 = self.add_point(T2[0], T2[1])
         line_name1 = f"Line_{a.name}{t1.name}"
@@ -453,6 +515,14 @@ def plot_points(ax, points: Dict[str, Tuple[float, float]]):
 
 def plot_lines_from_eq(ax, lines: Dict[str, Tuple[float, float, float]]):
     for line, (a, b, c) in lines.items():
+        if abs(b) < 1e-12:
+            if abs(a) < 1e-12:
+                continue  # degenerate: not a line
+            # vertical line x = -c/a; solving for y would divide by zero
+            x = -c / a
+            y_vals = np.linspace(*ax.get_ylim(), 2)
+            ax.plot([x, x], y_vals, color='black', lw=1.0, alpha=0.9)
+            continue
         x_vals = np.linspace(*ax.get_xlim(), 300)
         y_vals = (-a * x_vals - c) / b
         ax.plot(x_vals, y_vals, color='black', lw=1.0, alpha=0.9)
@@ -467,6 +537,16 @@ def plot_circles_from_eq(ax, circles: Dict[str, Tuple[float, float, float]]):
         ax.text(x, y, "", fontsize=9, color='black', ha='center', va='center')
 
 
-def is_collinear(a: Point, b: Point, c: Point, tol: float = 1e-10) -> bool:
-    area = a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)
-    return abs(area) < tol
+def line_through(p: Point, q: Point) -> Tuple[float, float, float]:
+    "coefficients (a, b, c) of the line ax + by + c = 0 through p and q"
+    return (q.y - p.y, p.x - q.x, q.x * p.y - q.y * p.x)
+
+
+def is_collinear(a: Point, b: Point, c: Point, tol: float = 1e-12) -> bool:
+    """Degeneracy guard for constructions.
+
+    Scale-invariant: the raw triangle area grows with the size of the configuration, so
+    a fixed absolute threshold is far too strict for the long (+/- 100 unit) helper lines
+    the constructions build and far too loose for points clustered near the origin.
+    """
+    return points_look_collinear(a, b, c, tol)

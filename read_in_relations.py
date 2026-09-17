@@ -4,19 +4,20 @@
 from relations import *
 
 def parse_text(statement_path):
-    f = open(f"Text Files/{statement_path}", 'r')
+    f = open(f"text_files/{statement_path}", 'r')
     statement_str = f.read()
     f.close()
     pieces = statement_str.split('; ')
     assumptions_strs = []
     goals_strs = []
-    for str in pieces:
-        str.strip()
-        str.replace('; ', '')
-        if str[0] == '?':
-            goals_strs.append(str[2:])
+    for piece in pieces:
+        piece = piece.strip()
+        if not piece:
+            continue
+        if piece[0] == '?':
+            goals_strs.append(piece[1:].strip())
         else:
-            assumptions_strs.append(str)
+            assumptions_strs.append(piece)
     return assumptions_strs, goals_strs
 
 def get_relation(rel_str, all_points):

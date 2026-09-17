@@ -1,3 +1,4 @@
+import math
 from typing import List, Optional
 
 
@@ -12,14 +13,62 @@ class Point:
         return self.name
 
 
-# Reference objects
-ZERO_ZERO = Point("_0", 0.0, 0.0)
-UNIT_X = Point("_x", 1.0, 0.0)
-UNIT_Y = Point("_y", 0.0, 1.0)
-MINUS_UNIT_X = Point("_-x", -1.0, 0.0)
+# Diagram-level numeric predicates.
+#
+# These are scale-invariant: they compare a cross/dot product against the product of the
+# two lengths, which is sin/cos of the angle between the lines. Comparing gradients
+# instead makes the tolerance meaningless for steep lines -- (0,0), (0.001,1),
+# (0.002,2.0000001) are collinear but their gradients differ by 1e-4 -- and needs a
+# special case for vertical lines that an exact `== 0` test almost never catches on
+# coordinates that came out of a file or a construction.
 
-ZERO_ANGLE = (frozenset({ZERO_ZERO, UNIT_X}), frozenset({ZERO_ZERO, UNIT_X}))
-PERPENDICULAR_ANGLE = (frozenset({ZERO_ZERO, UNIT_X}), frozenset({ZERO_ZERO, UNIT_Y}))
+def direction_mod_pi(p1: Point, p2: Point) -> float:
+    """Direction of line p1p2 as an angle in [0, pi).
+
+    Normalised so that a direction of pi reports as 0: they are the same line, and
+    letting one land at each end of the range makes orientation-sensitive callers
+    (see `AngleTable.add_perpendicular`) disagree about the same line.
+    """
+    a = math.atan2(p2.y - p1.y, p2.x - p1.x) % math.pi
+    if a > math.pi - 1e-12:
+        a = 0.0
+    return a
+
+
+def angles_close_mod_pi(a: float, b: float, tol: float = 1e-6) -> bool:
+    """True when two angles agree modulo pi, including across the 0/pi wrap."""
+    d = (a - b) % math.pi
+    return min(d, math.pi - d) <= tol
+
+
+def points_look_collinear(p1: Point, p2: Point, p3: Point, tol: float = 1e-6) -> bool:
+    ax, ay = p2.x - p1.x, p2.y - p1.y
+    bx, by = p3.x - p1.x, p3.y - p1.y
+    na = math.hypot(ax, ay)
+    nb = math.hypot(bx, by)
+    if na == 0.0 or nb == 0.0:
+        return True  # a repeated point is trivially collinear
+    return abs(ax * by - ay * bx) <= tol * na * nb
+
+
+def lines_look_parallel(p1: Point, p2: Point, p3: Point, p4: Point, tol: float = 1e-6) -> bool:
+    ax, ay = p2.x - p1.x, p2.y - p1.y
+    bx, by = p4.x - p3.x, p4.y - p3.y
+    na = math.hypot(ax, ay)
+    nb = math.hypot(bx, by)
+    if na == 0.0 or nb == 0.0:
+        return False
+    return abs(ax * by - ay * bx) <= tol * na * nb
+
+
+def lines_look_perpendicular(p1: Point, p2: Point, p3: Point, p4: Point, tol: float = 1e-6) -> bool:
+    ax, ay = p2.x - p1.x, p2.y - p1.y
+    bx, by = p4.x - p3.x, p4.y - p3.y
+    na = math.hypot(ax, ay)
+    nb = math.hypot(bx, by)
+    if na == 0.0 or nb == 0.0:
+        return False
+    return abs(ax * bx + ay * by) <= tol * na * nb
 
 
 # Base class for relations
@@ -39,9 +88,7 @@ class RelationNode:
         self.index = index
         return self
     
-    # TODO: improve representation
     def __repr__(self):
-        # return f"[{self.index}] {self.representation} from [{' ,'.join(str(p.index) for p in self.parents)}] via {self.rule}" if self.rule else f"[{self.index}] {self.representation}"
         repr_str = f"[{self.index}] {self.representation}"
         if self.parents:
             repr_str += f" from [{', '.join(str(p.index) for p in self.parents)}]"
@@ -84,22 +131,6 @@ class EqualAngle(RelationNode):
         )
 
         self.points = [p1, p2, p3, p4, p5, p6]
-
-
-# class Sameclock(RelationNode):
-#     def __init__(self, p1: Point, p2: Point, p3: Point,
-#                  p4: Point, p5: Point, p6: Point,
-#                  index: Optional[int] = None,
-#                  parents: Optional[set[RelationNode]] = None,
-#                  rule: Optional[str] = None):
-#         super().__init__(
-#             name="sameclock",
-#             index=index,
-#             relation=frozenset({(p1, p2, p3), (p4, p5, p6)}),
-#             representation=f"sameclock {p1} {p2} {p3} {p4} {p5} {p6}",
-#             parents=parents,
-#             rule=rule
-#         )
 
 
 class Parallel(RelationNode):
@@ -206,7 +237,6 @@ class SimilarTriangle1(RelationNode):
                 EqualRatio(p1, p2, p2, p3, p4, p5, p5, p6, parents=[self]),
                 EqualRatio(p2, p3, p3, p1, p5, p6, p6, p4, parents=[self]),
                 EqualRatio(p3, p1, p1, p2, p6, p4, p4, p5, parents=[self]),
-                # Sameclock(p1, p2, p3, p4, p5, p6, parents=[self])
             ]
         )
 
@@ -237,7 +267,6 @@ class SimilarTriangle2(RelationNode):
                 EqualRatio(p1, p2, p2, p3, p4, p5, p5, p6, parents=[self]),
                 EqualRatio(p2, p3, p3, p1, p5, p6, p6, p4, parents=[self]),
                 EqualRatio(p3, p1, p1, p2, p6, p4, p4, p5, parents=[self]),
-                # Sameclock(p1, p2, p3, p6, p5, p4, parents=[self])
             ]
         )
 
@@ -269,7 +298,6 @@ class CongruentTriangle1(RelationNode):
                 EqualAngle(p2, p3, p1, p5, p6, p4, parents=[self]),
                 EqualAngle(p3, p1, p2, p6, p4, p5, parents=[self]),
                 EqArea(p1, p2, p3, p4, p5, p6, parents=[self]),
-                # Sameclock(p1, p2, p3, p4, p5, p6, parents=[self])
             ]
         )
 
@@ -301,7 +329,6 @@ class CongruentTriangle2(RelationNode):
                 EqualAngle(p2, p3, p1, p4, p6, p5, parents=[self]),
                 EqualAngle(p3, p1, p2, p5, p4, p6, parents=[self]),
                 EqArea(p1, p2, p3, p4, p5, p6, parents=[self]),
-                # Sameclock(p1, p2, p3, p6, p5, p4, parents=[self])
             ]
         )
 
@@ -385,6 +412,3 @@ class EqArea(RelationNode):
         )
 
         self.points = [p1, p2, p3, p4, p5, p6]
-
-if __name__ == "__main__":
-    pass

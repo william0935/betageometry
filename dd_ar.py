@@ -4,17 +4,20 @@ import os
 import html
 from datetime import datetime
 from relations import *
-from Problem import Problem
+from problem import Problem
 from typing import List, Tuple, Optional
 from ar import *
-from Constructions import *
+from constructions import *
 
-class DDWithAR:    
-    def __init__(self, problem: Problem):
+class DDWithAR:
+    def __init__(self, problem: Problem, dump_tables: bool = False):
         self.problem = problem
         self.angle_table = AngleTable([])
         self.ratio_table = RatioTable([])
         self.area_table = AreaTable([])
+        # Debug output. Appending to the HTML file re-reads and rewrites the whole
+        # document each time, so it stays off unless explicitly asked for.
+        self.dump_tables = dump_tables
 
         # ADD THE NEW RULES HERE
         self.rules = [
@@ -35,35 +38,6 @@ class DDWithAR:
             self.congAPBP_congAQBQ__perpABPQ,
             self.check_collinearity
         ]
-
-    # def print_table(self, table):
-    #     if not table.rows:
-    #         print("  (empty)")
-    #         print()
-    #         return
-
-    #     header_indices = "         " + "".join(f"     [{i:1d}]" for i in range(len(table.header)))
-    #     segment_names = []
-    #     for col in table.header:
-    #         if isinstance(col, frozenset):
-    #             name = "{" + ", ".join(sorted(str(x) for x in col)) + "}"
-    #         else:
-    #             name = str(col)
-    #         segment_names.append(f"{name:>8}")
-    #     header_names = "          " + "".join(segment_names)
-        
-    #     print(header_indices)
-    #     print(header_names)
-    #     print("  " + "-" * (len(header_indices) - 2))
-
-    #     row_index = 0
-    #     for relation, row_list in table.rows.items():
-    #         for row in row_list:
-    #             row_str = "  Row " + f"{row_index}: " + "".join(f"{val:8.2f}" if abs(val) > 1e-10 else "    0.00" for val in row)
-    #             row_str += f"  # {relation}"
-    #             print(row_str)
-    #             row_index += 1
-    #     print()
 
     def render_table_html(self, table) -> str:
         """Return an HTML fragment rendering `table` as a labeled HTML table."""
@@ -187,11 +161,11 @@ h1,h2 { color: #333; }
             self.area_table.add_col(seg)
         points.append(point)
 
-        # TODO: this is extremely inefficient because it recalculates every single similar triangle/cyclic quad/collinear triple
-        # when adding a new point, rather than only checking for new ones that might involve the new point.
-        self.problem.similar_triangle_pairs = self.problem.find_similar_triangle_pairs()
-        self.problem.cyclic_quads = self.problem.find_cyclic_quads()
-        self.problem.collinear_triples = self.problem.find_collinear_triples()
+        # The diagram caches have to take the new point into account. Rebuilding them
+        # used to cost n^6 (~26s at 13 points, and a single incenter2 adds seven points
+        # at once); the searches are now n^3-ish, so a full rebuild is the cheap option
+        # and keeps the caches exactly consistent with a fresh Problem.
+        self.problem.rebuild_diagram_caches()
 
     def add_constructed_relation(self, relation: RelationNode):
         "add a constructed relation to the problem and update AR tables"
@@ -199,7 +173,13 @@ h1,h2 { color: #333; }
         self.update_AR_tables_with_relation(relation)
 
 
-    def apply_deduction_rules(self, max_iterations: int, canva: Canva) -> bool:
+    def apply_deduction_rules(self, max_iterations: int, canva: Canva,
+                              stop_when_solved: bool = True) -> bool:
+        """Run the rules until nothing new is derived, or `max_iterations` passes.
+
+        `stop_when_solved` exists for data generation, which wants the full deductive
+        closure of the diagram rather than the shortest route to the stated goal.
+        """
         # initialize all the names of the angles and segments into the angle table and ratio table
         for point1, point2 in itertools.combinations(self.problem.points, 2):
             segment = frozenset({point1, point2})
@@ -224,7 +204,8 @@ h1,h2 { color: #333; }
         for area in self.problem.relations.get("eqarea", []):
             self.area_table.add_eqarea(area)
 
-        self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
+        if self.dump_tables:
+            self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Initial tables")
 
         # do iterations for dd/ar
         for iteration in range(max_iterations):
@@ -246,25 +227,27 @@ h1,h2 { color: #333; }
                             self.update_AR_tables_with_relation(equiv_rel)
 
             if not progress_made:
-                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                if self.dump_tables:
+                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 break
                 
-            if self.problem.is_solved():
+            if self.problem.is_solved() and stop_when_solved:
                 print(f"Problem solved in iteration {iteration}!")
-                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
+                if self.dump_tables:
+                    self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
             
-            for goal in self.problem.remaining_goals:
+            # Iterate over a copy: `add_relation` discharges goals as a side effect, so
+            # the list can shrink underneath us. Discharging itself is left to Problem,
+            # which is the single owner of `remaining_goals`.
+            for goal in list(self.problem.remaining_goals):
                 is_related, parents = self.check_relation(goal)
                 if is_related:
-                    self.problem.remaining_goals.remove(goal)
                     goal.parents = parents
                     self.problem.add_relation(goal)
-                    self.problem.deduction_steps.append(goal)
-                    if not self.problem.remaining_goals:
-                        self.problem.solved = True
+                    if self.problem.solved:
                         break
-                
+
         return self.problem.is_solved()
     
     def congMAMB_colMAB__midpointMAB(self) -> List[RelationNode]:
@@ -393,10 +376,10 @@ h1,h2 { color: #333; }
 
                 are_lines_perpendicular1_12, parents_perp1_12 = self.are_lines_perpendicular(seg1_1, seg1_2)
                 are_lines_perpendicular1_23, parents_perp1_23 = self.are_lines_perpendicular(seg1_2, seg1_3)
-                are_lines_perpendicular1_13, parents_perp1_13 = self.are_lines_perpendicular(seg1_2, seg1_3)
+                are_lines_perpendicular1_13, parents_perp1_13 = self.are_lines_perpendicular(seg1_1, seg1_3)
                 are_lines_perpendicular2_12, parents_perp2_12 = self.are_lines_perpendicular(seg2_1, seg2_2)
-                are_lines_perpendicular2_13, parents_perp2_13 = self.are_lines_perpendicular(seg2_2, seg2_3)
-                are_lines_perpendicular2_23, parents_perp2_23 = self.are_lines_perpendicular(seg2_1, seg2_3)
+                are_lines_perpendicular2_23, parents_perp2_23 = self.are_lines_perpendicular(seg2_2, seg2_3)
+                are_lines_perpendicular2_13, parents_perp2_13 = self.are_lines_perpendicular(seg2_1, seg2_3)
                 if are_lines_perpendicular1_12 and are_lines_perpendicular2_12:
                     if are_seg_congruent1 and are_seg_congruent2:
                         new_relations.append(CongruentTriangle1(
@@ -858,21 +841,21 @@ h1,h2 { color: #333; }
                     if are_equal_ratio1:
                         new_relations.append(SimilarTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio1,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio1,
                             rule="check_triangle_similarity_HL_opposite"
                         ))
                         continue
                     if are_equal_ratio2:
                         new_relations.append(SimilarTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio2,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio2,
                             rule="check_triangle_similarity_HL_opposite"
                         ))
                         continue
                     if are_equal_ratio3:
                         new_relations.append(SimilarTriangle2(
                             p1, p2, p3, p4, p5, p6,
-                            parents=parents_perp1_13 | parents_perp2_13 | parents_ratio3,
+                            parents=parents_perp1_23 | parents_perp2_23 | parents_ratio3,
                             rule="check_triangle_similarity_SAS_opposite"
                         ))
                         continue
@@ -936,7 +919,10 @@ h1,h2 { color: #333; }
         new_relations = []
         cyclic_quads = self.problem.cyclic_quads
         for (p1, p2, p3, p4) in cyclic_quads:
-            are_eq_angle, parents = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p3}), frozenset({p4, p3})))
+            # Inscribed angles over the chord p1p2, seen from p3 and from p4. The second
+            # angle must be taken at p4; building it at p3 instead degenerates into a
+            # collinearity test on p2/p3/p4 and yields false cyclic quadrilaterals.
+            are_eq_angle, parents = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p4}), frozenset({p2, p4})))
             if are_eq_angle:
                 new_relations.append(Cyclic(
                     p1, p2, p3, p4,
@@ -1143,21 +1129,35 @@ h1,h2 { color: #333; }
     def eqratioDBDCABAC_colDBC__eqangleBADDAC(self) -> List[RelationNode]:
         """Check for equal angles from equal ratios and collinearity."""
         new_relations = []
-        for p1, p2, p3, p4 in itertools.permutations(self.problem.points, 4):
-            seg1 = frozenset({p4, p2})
-            seg2 = frozenset({p4, p3})
-            seg3 = frozenset({p1, p2})
-            seg4 = frozenset({p1, p3})
+        # The rule needs col(p2, p3, p4), so it is driven off the collinear triples the
+        # diagram already gives us rather than off every 4-permutation of the points.
+        # Enumerating permutations made this O(n^4) with up to seven span queries each --
+        # ~83k queries per iteration at 12 points, and the most expensive rule in the
+        # profile even at 5.
+        for triple in self.problem.collinear_triples:
+            # (p2, p3) are the two points whose ratio is compared, p4 the third one
+            for p2, p3, p4 in itertools.permutations(triple, 3):
+                are_collinear, parents_col = self.are_points_collinear(p2, p3, p4)
+                if not are_collinear:
+                    continue
+                for p1 in self.problem.points:
+                    if p1 is p2 or p1 is p3 or p1 is p4:
+                        continue
+                    are_not_collinear, _ = self.are_points_collinear(p1, p2, p3)
+                    if are_not_collinear:
+                        continue
 
-            are_equal_ratio, parents_ratio = self.are_equal_ratio(seg1, seg2, seg3, seg4)
-            are_collinear, parents_col = self.are_points_collinear(p2, p3, p4)
-            are_not_collinear, _ = self.are_points_collinear(p1, p2, p3)
-            if are_equal_ratio and are_collinear and not are_not_collinear:
-                new_relations.append(EqualAngle(
-                    p2, p1, p4, p4, p1, p3,
-                    parents=parents_ratio | parents_col,
-                    rule="eqratioDBDCABAC_colDBC__eqangleBADDAC"
-                ))
+                    seg1 = frozenset({p4, p2})
+                    seg2 = frozenset({p4, p3})
+                    seg3 = frozenset({p1, p2})
+                    seg4 = frozenset({p1, p3})
+                    are_equal_ratio, parents_ratio = self.are_equal_ratio(seg1, seg2, seg3, seg4)
+                    if are_equal_ratio:
+                        new_relations.append(EqualAngle(
+                            p2, p1, p4, p4, p1, p3,
+                            parents=parents_ratio | parents_col,
+                            rule="eqratioDBDCABAC_colDBC__eqangleBADDAC"
+                        ))
 
         return new_relations
     
@@ -1274,6 +1274,8 @@ h1,h2 { color: #333; }
         elif isinstance(rel, Perpendicular):
             p1, p2, p3, p4 = rel.points
             return self.are_lines_perpendicular(frozenset({p1, p2}), frozenset({p3, p4}))
+        elif isinstance(rel, EqArea):
+            return self.are_areas_equal(rel.points)
         else:
             return False, set()
     
@@ -1350,13 +1352,8 @@ h1,h2 { color: #333; }
             frozenset({p1, p3}) not in self.angle_table.col_id):
             return False, set()
 
-        if (p2.x - p1.x == 0 and p3.x - p2.x != 0) or (p3.x - p2.x == 0 and p2.x - p1.x != 0):
+        if not points_look_collinear(p1, p2, p3):
             return False, set()
-        elif p2.x - p1.x != 0 and p3.x - p2.x != 0:
-            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-            gradient2 = (p3.y - p2.y) / (p3.x - p2.x)
-            if abs(gradient1 - gradient2) > 1e-6:
-                return False, set()
 
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[frozenset({p1, p2})]] += 1
@@ -1386,14 +1383,9 @@ h1,h2 { color: #333; }
             frozenset({p3, p4}) not in self.angle_table.col_id):
             return False, set()
 
-        if (p2.x - p1.x == 0 and p4.x - p3.x != 0) or (p4.x - p3.x == 0 and p2.x - p1.x != 0):
+        if not lines_look_parallel(p1, p2, p3, p4):
             return False, set()
-        elif p2.x - p1.x != 0 and p4.x - p3.x != 0:
-            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-            gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
-            if abs(gradient1 - gradient2) > 1e-6:
-                return False, set()
-        
+
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
         row = [0] * self.angle_table.table_length()
@@ -1411,13 +1403,8 @@ h1,h2 { color: #333; }
         
         p1, p2 = list(seg1)
         p3, p4 = list(seg2)
-        if (p2.x - p1.x == 0 and p4.y - p3.y != 0) or (p4.x - p3.x == 0 and p2.y - p1.y != 0):
+        if not lines_look_perpendicular(p1, p2, p3, p4):
             return False, set()
-        elif p2.x - p1.x != 0 and p4.x - p3.x != 0:
-            gradient1 = (p2.y - p1.y) / (p2.x - p1.x)
-            gradient2 = (p4.y - p3.y) / (p4.x - p3.x)
-            if abs(gradient1 * gradient2 + 1) > 1e-6:
-                return False, set()
 
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[seg1]] = 1
@@ -1450,9 +1437,10 @@ h1,h2 { color: #333; }
             return True, parents_cong | parents_col
         return False, set()
 
-    def form_triangle(self, points: List[Point]) -> Optional[Tuple[Point, Point, Point, Point]]:
-        """Given four points from a congruence relation, return them as triangle points; 
-        if impossible, return None."""
+    def form_triangle(self, points: List[Point]) -> Tuple[Optional[Point], ...]:
+        """Given four points from a congruence relation, reorder them so the shared point
+        comes first in each pair. Returns a 4-tuple of Nones if the pairs share no point,
+        so callers must test the first element against None."""
         p1, p2, p3, p4 = points
         if p1 == p3:
             pass
@@ -1473,14 +1461,15 @@ h1,h2 { color: #333; }
         seg2_1, seg2_2 = angle2
         p1, p2, p4, p3 = self.form_triangle(list(seg1_1) + list(seg1_2))
         q1, q2, q4, q3 = self.form_triangle(list(seg2_1) + list(seg2_2))
+        if p1 is None or q1 is None:
+            # the two segments of an "angle" do not share a vertex
+            return False
 
         # p1 is vertex of angle1, q1 is vertex of angle2
         # angle1 = p2 p1 p3, angle2 = q2 q1 q3
         angle1 = math.atan2(p2.y - p1.y, p2.x - p1.x) - math.atan2(p3.y - p1.y, p3.x - p1.x)
         angle2 = math.atan2(q2.y - q1.y, q2.x - q1.x) - math.atan2(q3.y - q1.y, q3.x - q1.x)
-        angle1 = (angle1 + math.pi) % math.pi
-        angle2 = (angle2 + math.pi) % math.pi
-        return abs(angle1 - angle2) < 1e-6
+        return angles_close_mod_pi(angle1, angle2)
 
     def are_areas_equal(self, points: List[Point]) -> Tuple[bool, set[RelationNode]]:
         area_row = [0] * self.area_table.table_length()

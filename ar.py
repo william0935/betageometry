@@ -8,63 +8,157 @@ def is_sameclock(p1: Point, p2: Point, p3: Point, p4: Point, p5: Point, p6: Poin
     return ((p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x)) * \
             ((p5.x - p4.x) * (p6.y - p4.y) - (p5.y - p4.y) * (p6.x - p4.x)) > 0
 
+
 # Special column key: represents a fixed +90 degrees constant in column 0
 CONST_90 = "90_degrees"
 
+# Entries below this are treated as exact zeros during elimination. Rows are built from
+# small integers, so anything at this magnitude is floating-point noise.
+_PIVOT_EPS = 1e-14
+
+
 class Table:
+    """A set of linear constraints over segment/angle columns.
+
+    Membership ("is this row in the span of the rows I already have?") is the single
+    hottest operation in the solver, so the table keeps an incremental row-echelon
+    basis rather than re-factorising from scratch on every query. A query is one
+    O(rows x cols) elimination sweep; the elimination coefficients double as the
+    dependency certificate, so no separate least-squares solve is needed.
+
+    Every row that survives `add_row` is by construction linearly independent of the
+    rows before it, so there is exactly one basis vector per stored row.
+    """
+
     def __init__(self, header: List[Any]):
         self.header = list(header)
         self.col_id: Dict[Any, int] = {col: i for i, col in enumerate(self.header)}
-        self.rows: Dict[RelationNode, List[np.ndarray]] = {}
+        # Kept as plain lists purely so the HTML dump can render the original rows.
+        self.rows: Dict[RelationNode, List[List[int]]] = {}
         self.relations: set[RelationNode] = set()  # Track all relations in order
+
+        # Echelon basis, stored in fixed-capacity arrays that double on demand so that
+        # adding a column or a row is amortised O(1) rather than a full reallocation.
+        self._n = 0                                  # number of basis vectors / stored rows
+        self._basis = np.zeros((8, 8))               # _basis[i][_pivots[i]] == 1
+        self._coeff = np.zeros((8, 8))               # _basis[i] == sum_k _coeff[i][k] * row_k
+        self._pivots: List[int] = []
+        self._row_relation: List[RelationNode] = []
+        # Memo for is_spanned. The rules issue the same queries over and over -- the
+        # triangle rules alone ask about every shared segment of every candidate pair,
+        # on every pass.
+        #
+        # `_span_cache` is never invalidated: `add_row` only ever stores rows that are
+        # outside the current span, so the span grows monotonically and a row that is
+        # spanned stays spanned. The stored rows also stay linearly independent, so the
+        # combination that expresses a spanned row -- the dependency certificate -- is
+        # unique and does not change when later rows arrive.
+        #
+        # A miss, on the other hand, can turn into a hit as soon as a row is added, so
+        # `_miss_cache` is dropped whenever the table changes.
+        self._span_cache: Dict[tuple, Tuple[bool, frozenset]] = {}
+        self._miss_cache: set = set()
+
+    def _ensure_capacity(self, n_rows: int, n_cols: int):
+        cap_r, cap_c = self._basis.shape
+        new_r, new_c = cap_r, cap_c
+        while new_r < n_rows:
+            new_r *= 2
+        while new_c < n_cols:
+            new_c *= 2
+        if new_r == cap_r and new_c == cap_c:
+            return
+        basis = np.zeros((new_r, new_c))
+        basis[:cap_r, :cap_c] = self._basis
+        self._basis = basis
+        coeff = np.zeros((new_r, new_r))
+        coeff[:cap_r, :cap_r] = self._coeff
+        self._coeff = coeff
+
+    def _eliminate(self, row: List[Any]) -> Tuple[np.ndarray, np.ndarray]:
+        """Reduce `row` against the basis.
+
+        Returns (residual, comb) with  row == residual + sum_k comb[k] * row_k.
+        """
+        n = self._n
+        work = np.zeros(self._basis.shape[1])
+        work[:len(row)] = row
+        comb = np.zeros(self._basis.shape[0])
+        for i in range(n):
+            f = work[self._pivots[i]]
+            if abs(f) > _PIVOT_EPS:
+                work -= f * self._basis[i]
+                comb[:n] += f * self._coeff[i, :n]
+        return work, comb
 
     def add_col(self, col_name: Any):
         if col_name in self.col_id:
             return
         self.header.append(col_name)
         self.col_id[col_name] = len(self.header) - 1
-        # Extend all existing rows with a zero entry
-        for relation_node, row_list in self.rows.items():
-            for i in range(len(row_list)):
-                row_list[i] = np.append(row_list[i], 0)
+        # Extend the display rows; the basis is zero-padded by construction, so it
+        # needs no work here beyond having room for the new column.
+        for row_list in self.rows.values():
+            for row in row_list:
+                row.append(0)
+        self._ensure_capacity(self._n, len(self.header))
+        self._miss_cache.clear()
 
-    def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, set[RelationNode]]:
-        if not self.rows:
-            return False, set()
+    def is_spanned(self, row: List[Any], tol: float = 1e-10) -> Tuple[bool, frozenset]:
+        # The zero row is the empty constraint ("0 = 0"), which every set of rows
+        # implies, including none at all. It needs no premises to justify it.
+        if not any(row):
+            return True, frozenset()
+        if self._n == 0:
+            return False, frozenset()
 
-        all_rows = []
-        row_to_relation = []
-        for relation_key, row_list in self.rows.items():
-            for r in row_list:
-                all_rows.append(np.asarray(r, dtype=float))
-                row_to_relation.append(relation_key)
-        
-        R = np.vstack(all_rows)
-        r = np.asarray(row, dtype=float)
-        rank_R = np.linalg.matrix_rank(R, tol=tol)
-        rank_aug = np.linalg.matrix_rank(np.vstack([R, r]), tol=tol)
-        is_spanned = (rank_R == rank_aug)
-        
-        if not is_spanned:
-            return False, set()
+        key = tuple(row)
+        cached = self._span_cache.get(key)
+        if cached is not None:
+            return cached
+        if key in self._miss_cache:
+            return False, frozenset()
 
-        coeffs, _, _, _ = np.linalg.lstsq(R.T, r.T, rcond=None)
-        nonzero_indices = np.where(np.abs(coeffs) > tol)[0]
+        work, comb = self._eliminate(row)
+        if np.abs(work).max() > tol:
+            self._miss_cache.add(key)
+            return False, frozenset()
 
-        used_relations = {row_to_relation[i] for i in nonzero_indices}
-        
-        return True, used_relations
+        # frozenset so the memoised value cannot be mutated through a caller
+        result = (True, frozenset(self._row_relation[k]
+                                  for k in np.nonzero(np.abs(comb[:self._n]) > tol)[0]))
+        self._span_cache[key] = result
+        return result
 
-    def add_row(self, row: List[Any], relation: RelationNode):
+    def add_row(self, row: List[Any], relation: RelationNode, tol: float = 1e-10):
         if len(row) != len(self.header):
             raise ValueError("Row length does not match header length.")
-        is_spanned, _ = self.is_spanned(row)
-        if not is_spanned:
-            new_row = np.asarray(row, dtype=int)
-            if relation not in self.rows:
-                self.rows[relation] = []
-            self.rows[relation].append(new_row)
-            self.relations.add(relation)
+
+        n = self._n
+        self._ensure_capacity(n + 1, len(self.header))
+        work, comb = self._eliminate(row)
+
+        nonzero = np.abs(work) > tol
+        if not nonzero.any():
+            return  # already implied by the existing rows
+
+        self._miss_cache.clear()
+
+        # row_n == work + sum_k comb[k] * row_k, so normalising work by its leading
+        # entry gives a basis vector expressed over the stored rows as (e_n - comb)/scale.
+        pivot = int(np.argmax(nonzero))
+        scale = work[pivot]
+        self._basis[n] = work / scale
+        self._coeff[n] = -comb / scale
+        self._coeff[n, n] += 1.0 / scale
+        self._pivots.append(pivot)
+        self._row_relation.append(relation)
+        self._n = n + 1
+
+        if relation not in self.rows:
+            self.rows[relation] = []
+        self.rows[relation].append(list(row))
+        self.relations.add(relation)
 
     def table_length(self) -> int:
         return len(self.header)
@@ -147,12 +241,13 @@ class AngleTable(Table):
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
 
-        angle1 = math.atan2(p2.y - p1.y, p2.x - p1.x)
-        angle2 = math.atan2(p4.y - p3.y, p4.x - p3.x)
-        angle1 = (angle1 + math.pi) % math.pi
-        angle2 = (angle2 + math.pi) % math.pi
-
-        # print(p1, p2, p3, p4, angle1 / math.pi * 180, angle2 / math.pi * 180)
+        # The row encodes dir(seg1) - dir(seg2) - 90 = 0, so seg1 must be the line whose
+        # direction is the larger of the two. The tie-break only has to be *consistent*
+        # for a given pair of segments -- picking the opposite orientation for the same
+        # pair anywhere else would let the solver derive CONST_90 == 0 and collapse the
+        # table -- which is why direction_mod_pi pins the pi end of the range to 0.
+        angle1 = direction_mod_pi(p1, p2)
+        angle2 = direction_mod_pi(p3, p4)
 
         if angle1 < angle2:
             seg1, seg2 = seg2, seg1

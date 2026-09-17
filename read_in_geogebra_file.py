@@ -263,72 +263,17 @@ def combine_lines_and_segments_dictionaries(
     return combined_dict
 
 
-def rename_circle_dictionary(
-    circles: Dict[str, Tuple[float, float, float]]
-) -> Dict[str, Tuple[float, float, float]]:
-    """
-    Renames the keys in the circle dictionary to sequential labels 'Circle1', 'Circle2', etc.
-
-    Args:
-        circles (Dict[str, Tuple[float, float, float]]): A dictionary with circle data where
-            keys are labels and values are tuples of the form (cx, cy, r).
-
-    Returns:
-        Dict[str, Tuple[float, float, float]]: A new dictionary with renamed keys.
-
-    Raises:
-        TypeError: If the input is not a dictionary.
-    """
-    if not isinstance(circles, dict):
-        raise TypeError("Input must be a dictionary.")
-
-    renamed_circles = {}
-    for idx, (key, value) in enumerate(circles.items(), start=1):
-        renamed_circles[f"Circle{idx}"] = value
-
-    return renamed_circles
-
-def combine_lines_and_segments_dictionaries(
-    dict1: Dict[str, Tuple[float, float, float]],
-    dict2: Dict[str, Tuple[float, float, float]]
-) -> Dict[str, Tuple[float, float, float]]:
-    """
-    Combines two dictionaries and renames the keys sequentially as 'L1', 'L2', 'L3', etc.
-
-    Args:
-        dict1 (Dict[str, Tuple[float, float, float]]): The first dictionary.
-        dict2 (Dict[str, Tuple[float, float, float]]): The second dictionary.
-
-    Returns:
-        Dict[str, Tuple[float, float, float]]: A new dictionary with keys renamed sequentially.
-
-    Raises:
-        TypeError: If either dict1 or dict2 is not a dictionary.
-    """
-    if not isinstance(dict1, dict) or not isinstance(dict2, dict):
-        raise TypeError("Both inputs must be dictionaries.")
-
-    combined_dict = {}
-    all_items = list(dict1.items()) + list(dict2.items())
-
-    for idx, (_, value) in enumerate(all_items, start=1):
-        combined_dict[f"L{idx}"] = value
-
-    return combined_dict
-
-
-
-
 def parse_picture(filename: str):
-    # Build a path to the .ggb file inside "Geogebra Files"
+    # Build a path to the .ggb file inside "geogebra_files"
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    ggb_path = os.path.join(script_dir, "Geogebra Files", filename)
+    ggb_path = os.path.join(script_dir, "geogebra_files", filename)
     points, lines, segments, circles = parse_ggb_file(ggb_path)
     new_circles = rename_circle_dictionary(circles)
     new_lines = combine_lines_and_segments_dictionaries(lines,segments)
     return points, new_lines, new_circles
 
-x,y,z= parse_picture('test.ggb')
-print(x)
-print(y)
-print(z)
+if __name__ == "__main__":
+    x, y, z = parse_picture('test.ggb')
+    print(x)
+    print(y)
+    print(z)

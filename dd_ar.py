@@ -23,6 +23,7 @@ class DDWithAR:
         self.rules = [
             self.check_triangle_congruence_all_permutations,
             self.check_triangle_similarity_all_permutations,
+            self.congMAMB_colMAB__midpointMAB,
             self.congOAOB_congOBOC__circleOABC,
             self.circleOABC_congOCOD__cyclicABCD,
             self.eqangleABCADC__cyclicABCD,
@@ -153,12 +154,11 @@ h1,h2 { color: #333; }
         points = self.problem.points
         for existing_point in points:
             if existing_point.name == point.name:
-                continue
+                raise ValueError(f"Point with name {point.name} already exists in the problem.")
             seg = frozenset({existing_point, point})
             self.angle_table.add_col(seg)
             self.ratio_table.add_col(seg)
             self.area_table.add_col(seg)
-<<<<<<< HEAD
         points.append(point)
 
         # The diagram caches have to take the new point into account. Rebuilding them
@@ -166,12 +166,6 @@ h1,h2 { color: #333; }
         # at once); the searches are now n^3-ish, so a full rebuild is the cheap option
         # and keeps the caches exactly consistent with a fresh Problem.
         self.problem.rebuild_diagram_caches()
-=======
-        
-        self.problem.similar_triangle_pairs.extend(self.problem.given_point_similar_triangle_pairs(point))
-        self.problem.cyclic_quads.extend(self.problem.given_point_cyclic_quads(point))
-        self.problem.collinear_triples.extend(self.problem.given_point_collinear_triples(point))
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
 
     def add_constructed_relation(self, relation: RelationNode):
         "add a constructed relation to the problem and update AR tables"
@@ -221,13 +215,6 @@ h1,h2 { color: #333; }
             for rule in self.rules:
                 new_relations.extend(rule())
 
-            for goal in self.problem.remaining_goals:
-                is_related, parents = self.check_relation(goal)
-                if is_related:
-                    goal.parents = parents
-                    new_relations.append(goal)
-                    progress_made = True
-
             for new_rel in new_relations:
                 progress = self.problem.add_relation(new_rel)
                 if progress:
@@ -239,21 +226,16 @@ h1,h2 { color: #333; }
                         for equiv_rel in new_rel.equivalent:
                             self.update_AR_tables_with_relation(equiv_rel)
 
-<<<<<<< HEAD
             if not progress_made:
                 if self.dump_tables:
                     self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 break
                 
             if self.problem.is_solved() and stop_when_solved:
-=======
-            if self.problem.is_solved():
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
                 print(f"Problem solved in iteration {iteration}!")
                 if self.dump_tables:
                     self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
                 return True
-<<<<<<< HEAD
             
             # Iterate over a copy: `add_relation` discharges goals as a side effect, so
             # the list can shrink underneath us. Discharging itself is left to Problem,
@@ -266,14 +248,46 @@ h1,h2 { color: #333; }
                     if self.problem.solved:
                         break
 
-=======
-                      
-            if not progress_made:
-                self.dump_AR_tables_html(filename="ar_tables.html", mode="a", title="Final tables")
-                break
-                
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
         return self.problem.is_solved()
+    
+    def congMAMB_colMAB__midpointMAB(self) -> List[RelationNode]:
+        new_relations = []
+        congruences = self.problem.relations.get("cong", [])
+        collinears = self.problem.relations.get("col", [])
+        
+        for cong in congruences:
+            p1, p2, p3, p4 = cong.points
+            if p1 == p4:
+                p3, p4 = p4, p3
+            elif p2 == p3:
+                p1, p2 = p2, p1
+            elif p2 == p4:
+                p1, p2, p3, p4 = p2, p1, p4, p3
+            elif p1 == p3:
+                pass
+            else:
+                continue
+
+            M, A, B = p1, p2, p4
+            seg_MA = frozenset({M, A})
+            seg_MB = frozenset({M, B})
+
+            if seg_MA in self.ratio_table.col_id and seg_MB in self.ratio_table.col_id:
+                cong_row = [0] * self.ratio_table.table_length()
+                cong_row[self.ratio_table.col_id[seg_MA]] = 1
+                cong_row[self.ratio_table.col_id[seg_MB]] = -1
+                
+                is_spanned, parents = self.ratio_table.is_spanned(cong_row)
+                if is_spanned:
+                    col = next((c for c in collinears if set(c.points) == set({M, A, B})), None)
+                    if col:
+                        new_relations.append(Midpoint(
+                            M, A, B,
+                            parents=parents,
+                            rule="cong_MAMB_col_MAB__midpoint_MAB"
+                        ))
+        
+        return new_relations
 
     def check_triangle_congruence_all_permutations(self) -> List[RelationNode]:
         """Check for triangle congruence for all permutations of triangle vertices."""
@@ -904,58 +918,35 @@ h1,h2 { color: #333; }
         """Check for cyclic quadrilateral formation from equal angles."""
         new_relations = []
         cyclic_quads = self.problem.cyclic_quads
+        # Four concyclic points give six chords, and each chord is subtended by the
+        # remaining two. Any one of those six equal-angle pairs is enough to conclude
+        # the quadrilateral is cyclic, so all six are tried rather than just one.
+        #
+        # Both angles of a pair must be taken at *different* vertices, over the *same*
+        # chord. Building both at the same vertex degenerates into a collinearity test
+        # and yields false cyclic quadrilaterals; pairing two different chords is
+        # likewise unsound, since equal angles over unrelated chords imply nothing.
         for (p1, p2, p3, p4) in cyclic_quads:
-<<<<<<< HEAD
-            # Inscribed angles over the chord p1p2, seen from p3 and from p4. The second
-            # angle must be taken at p4; building it at p3 instead degenerates into a
-            # collinearity test on p2/p3/p4 and yields false cyclic quadrilaterals.
-            are_eq_angle, parents = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p4}), frozenset({p2, p4})))
-            if are_eq_angle:
-=======
-            are_eq_angle1, parents1 = self.are_angles_equal((frozenset({p3, p1}), frozenset({p4, p1})), (frozenset({p3, p2}), frozenset({p4, p2})))
-            are_eq_angle2, parents2 = self.are_angles_equal((frozenset({p2, p1}), frozenset({p4, p1})), (frozenset({p2, p3}), frozenset({p4, p3})))
-            are_eq_angle3, parents3 = self.are_angles_equal((frozenset({p2, p1}), frozenset({p3, p1})), (frozenset({p2, p4}), frozenset({p3, p4})))
-            are_eq_angle4, parents4 = self.are_angles_equal((frozenset({p1, p2}), frozenset({p4, p2})), (frozenset({p1, p3}), frozenset({p2, p3})))
-            are_eq_angle5, parents5 = self.are_angles_equal((frozenset({p1, p2}), frozenset({p3, p2})), (frozenset({p1, p4}), frozenset({p3, p4})))
-            are_eq_angle6, parents6 = self.are_angles_equal((frozenset({p1, p3}), frozenset({p2, p3})), (frozenset({p1, p4}), frozenset({p2, p4})))
-            
-            if are_eq_angle1:
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
-                new_relations.append(Cyclic(
-                    p1, p2, p3, p4,
-                    parents=parents1,
-                    rule="eqangleABCADC__cyclicABCD"
-                ))
-            elif are_eq_angle2:
-                new_relations.append(Cyclic(
-                    p1, p2, p3, p4,
-                    parents=parents2,
-                    rule="eqangleABCADC__cyclicABCD"
-                ))
-            elif are_eq_angle3:
-                new_relations.append(Cyclic(
-                    p1, p2, p3, p4,
-                    parents=parents3,
-                    rule="eqangleABCADC__cyclicABCD"
-                ))
-            elif are_eq_angle4:
-                new_relations.append(Cyclic(
-                    p1, p2, p3, p4,
-                    parents=parents4,
-                    rule="eqangleABCADC__cyclicABCD"
-                ))
-            elif are_eq_angle5:
-                new_relations.append(Cyclic(
-                    p1, p2, p3, p4,
-                    parents=parents5,
-                    rule="eqangleABCADC__cyclicABCD"
-                ))
-            elif are_eq_angle6:
-                new_relations.append(Cyclic(
-                    p1, p2, p3, p4,
-                    parents=parents6,
-                    rule="eqangleABCADC__cyclicABCD"
-                ))
+            quad_chords = [
+                ((p3, p4), (p1, p2)),   # chord p3p4 seen from p1 and from p2
+                ((p2, p4), (p1, p3)),
+                ((p2, p3), (p1, p4)),
+                ((p1, p4), (p2, p3)),
+                ((p1, p3), (p2, p4)),
+                ((p1, p2), (p3, p4)),
+            ]
+            for (end1, end2), (apex1, apex2) in quad_chords:
+                angle_at_first = (frozenset({end1, apex1}), frozenset({end2, apex1}))
+                angle_at_second = (frozenset({end1, apex2}), frozenset({end2, apex2}))
+                are_eq_angle, parents = self.are_angles_equal(angle_at_first,
+                                                              angle_at_second)
+                if are_eq_angle:
+                    new_relations.append(Cyclic(
+                        p1, p2, p3, p4,
+                        parents=parents,
+                        rule="eqangleABCADC__cyclicABCD"
+                    ))
+                    break
 
         return new_relations
     
@@ -1301,14 +1292,11 @@ h1,h2 { color: #333; }
         elif isinstance(rel, Perpendicular):
             p1, p2, p3, p4 = rel.points
             return self.are_lines_perpendicular(frozenset({p1, p2}), frozenset({p3, p4}))
-<<<<<<< HEAD
         elif isinstance(rel, EqArea):
             return self.are_areas_equal(rel.points)
-=======
         elif isinstance(rel, Midpoint):
             mid, p1, p2 = rel.points
             return self.is_midpoint(mid, p1, p2)
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
         else:
             return False, set()
     
@@ -1385,22 +1373,9 @@ h1,h2 { color: #333; }
             frozenset({p1, p3}) not in self.angle_table.col_id):
             return False, set()
 
-<<<<<<< HEAD
         if not points_look_collinear(p1, p2, p3):
             return False, set()
-=======
-        P1 = np.array([[p1.x], [p1.y]])
-        P2 = np.array([[p2.x], [p2.y]])
-        P3 = np.array([[p3.x], [p3.y]])
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
 
-        area_matrix = np.array([[P1[0][0], P1[1][0], 1],
-                                [P2[0][0], P2[1][0], 1],
-                                [P3[0][0], P3[1][0], 1]])
-        area = 0.5 * np.linalg.det(area_matrix)
-        if abs(area) > 1e-5:
-            return False, set()
-        
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[frozenset({p1, p2})]] += 1
         row1[self.angle_table.col_id[frozenset({p2, p3})]] += -1
@@ -1429,23 +1404,9 @@ h1,h2 { color: #333; }
             frozenset({p3, p4}) not in self.angle_table.col_id):
             return False, set()
 
-<<<<<<< HEAD
         if not lines_look_parallel(p1, p2, p3, p4):
             return False, set()
 
-=======
-        P1 = np.array([[p1.x], [p1.y]])
-        P2 = np.array([[p2.x], [p2.y]])
-        P3 = np.array([[p3.x], [p3.y]])
-        P4 = np.array([[p4.x], [p4.y]])
-
-        if np.array_equal(P2 - P1, np.array([[0], [0]])) or np.array_equal(P4 - P3, np.array([[0], [0]])):
-            return False, set()
-        cross_product = (P2 - P1)[0][0] * (P4 - P3)[1][0] - (P2 - P1)[1][0] * (P4 - P3)[0][0]
-        if abs(cross_product) > 1e-5:
-            return False, set()
-        
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
         seg1 = frozenset({p1, p2})
         seg2 = frozenset({p3, p4})
         row = [0] * self.angle_table.table_length()
@@ -1463,22 +1424,9 @@ h1,h2 { color: #333; }
         
         p1, p2 = list(seg1)
         p3, p4 = list(seg2)
-<<<<<<< HEAD
         if not lines_look_perpendicular(p1, p2, p3, p4):
             return False, set()
-=======
-        P1 = np.array([[p1.x], [p1.y]])
-        P2 = np.array([[p2.x], [p2.y]])
-        P3 = np.array([[p3.x], [p3.y]])
-        P4 = np.array([[p4.x], [p4.y]])
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
 
-        if np.array_equal(P2 - P1, np.array([[0], [0]])) or np.array_equal(P4 - P3, np.array([[0], [0]])):
-            return False, set()
-        dot_product = (P2 - P1).T @ (P4 - P3)
-        if abs(dot_product[0][0]) > 1e-5:
-            return False, set()
-        
         row1 = [0] * self.angle_table.table_length()
         row1[self.angle_table.col_id[seg1]] = 1
         row1[self.angle_table.col_id[seg2]] = -1
@@ -1501,13 +1449,6 @@ h1,h2 { color: #333; }
 
     def is_midpoint(self, mid: Point, p1: Point, p2: Point) -> Tuple[bool, set[RelationNode]]:
         """Check if mid is the midpoint of segment p1p2 via the RatioTable."""
-        M = np.array([[mid.x], [mid.y]])
-        P1 = np.array([[p1.x], [p1.y]])
-        P2 = np.array([[p2.x], [p2.y]])
-        midpoint = (P1 + P2) / 2
-        if np.linalg.norm(M - midpoint) > 1e-5:
-            return False, set()
-
         seg1 = frozenset({mid, p1})
         seg2 = frozenset({mid, p2})
 

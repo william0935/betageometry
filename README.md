@@ -30,10 +30,26 @@ Entry points: `solve.py`, `generate_batch.py`, `consolidate_data.py`,
 
 ## Install
 
+Work inside a virtual environment so the project's dependencies stay separate from your
+system Python — `torch` in particular is large and version-sensitive.
+
 ```bash
-pip install -e .            # solving and data generation
-pip install -e '.[llm]'     # adds torch/transformers/peft, for Gemma
-pip install -e '.[dev]'     # pytest
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+python -m pip install -e .         # solving and data generation
+python -m pip install -e '.[llm]'  # adds torch/transformers/peft, for Gemma
+python -m pip install -e '.[dev]'  # pytest
+```
+
+Everything below assumes the environment is active — `source .venv/bin/activate` in each
+new shell. `deactivate` leaves it. To start over, delete `.venv/` and recreate it.
+
+If you would rather not activate it, call the interpreter directly:
+
+```bash
+.venv/bin/python solve.py problem1
+.venv/bin/python -m pytest
 ```
 
 ## Solve a problem
@@ -87,6 +103,7 @@ first). Training and inference build their prompts through the same
 ## Tests
 
 ```bash
+source .venv/bin/activate
 pytest
 ```
 

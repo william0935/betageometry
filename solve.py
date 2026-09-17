@@ -5,13 +5,9 @@
     python solve.py usamo_2023_p1 --gemma gemma-finetuned-geometry
     python solve.py usamo_2023_p1 --random-rabbits           # baseline proposer
 
-<<<<<<< HEAD
 A problem named `foo` is read from `geogebra_files/foo.ggb` (the diagram) and
 `text_files/foo.txt` (the assumptions and goal).
 """
-=======
-problem_name = "problem2"
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
 
 import argparse
 import time
@@ -42,7 +38,6 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
 
-<<<<<<< HEAD
     from constructions import Canva
     from dd_ar import DDWithAR
     from problem import Problem
@@ -50,20 +45,6 @@ def main():
     from read_in_relations import read_in_relations
     from relations import Point
     from search import solve
-=======
-# if problem_name == "usamo_2023_p1":
-    # specific construction for USAMO 2023 P1
-    # for i, p in enumerate(points):
-    #     print(f"Point{i}: {p}: ({p.x}, {p.y})")
-    # p, relations = canva.foot(points[0], points[1], points[2])
-    
-    # p, relations = canva.apply_llm_construction("foot(A, B, C)")
-    # solver.add_constructed_point(p)
-    # for r in relations:
-    #     solver.add_constructed_relation(r)
-    #     print(f"Constructed relation: {r}")
-    # solver.apply_deduction_rules(50, canva)
->>>>>>> 6b5bb16886069cf2d557723cbaee5eb3172e2f42
 
     points_dict, lines, circles = parse_picture(f"{args.problem}.ggb")
     points = [Point(name, x, y) for name, (x, y) in points_dict.items()]
